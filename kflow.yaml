@@ -1,7 +1,7 @@
 name: ofp-sam-bet-2026-plot
 description: Build report-ready BET 2026 plots from stepwise model payloads.
 command: bash run.sh
-docker_image: ghcr.io/pacificcommunity/tuna-flow:v1.5
+docker_image: ghcr.io/pacificcommunity/tuna-flow:v1.6
 resources:
   cpus: 2
   memory: 12GB
@@ -9,10 +9,19 @@ resources:
 env:
   KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "true"
   KFLOW_RUNTIME_UPDATE: auto
-  KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@36bb10e
+  KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@1fc3156
   KFLOW_RUNTIME_GITHUB_AUTH: "true"
   KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
+  MFCLSHINY_REPORT_DPI: "180"
+  MFCLSHINY_OPTIMIZE_FIGURES: "false"
   PLOT_OPTIMIZE_FIGURES: "true"
+  PLOT_OPTIMIZE_MODE: lossy
+  PLOT_PNGQUANT_QUALITY: "60-85"
+  PLOT_WEBP_FIGURES: "true"
+  PLOT_WEBP_QUALITY: "72"
+  PLOT_PDF_JPEG_FIGURES: "true"
+  PLOT_JPEG_QUALITY: "82"
+  PLOT_JPEG_SAMPLING_FACTOR: "4:2:0"
 output_patterns:
   - outputs/**
 triggers:
@@ -27,10 +36,17 @@ triggers:
         RUN_LABEL: "report-from-{{ job.id }}"
         KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "true"
         KFLOW_RUNTIME_UPDATE: auto
-        KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@36bb10e
+        KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@1fc3156
         KFLOW_RUNTIME_GITHUB_AUTH: "true"
         KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
         PLOT_OPTIMIZE_FIGURES: "true"
+        PLOT_OPTIMIZE_MODE: lossy
+        PLOT_PNGQUANT_QUALITY: "60-85"
+        PLOT_WEBP_FIGURES: "true"
+        PLOT_WEBP_QUALITY: "72"
+        PLOT_PDF_JPEG_FIGURES: "true"
+        PLOT_JPEG_QUALITY: "82"
+        PLOT_JPEG_SAMPLING_FACTOR: "4:2:0"
       tags:
         auto: "true"
         stage: report
@@ -48,4 +64,13 @@ job_config:
     - KFLOW_RUNTIME_PACKAGES
     - KFLOW_RUNTIME_GITHUB_AUTH
     - KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME
+    - MFCLSHINY_REPORT_DPI
+    - MFCLSHINY_OPTIMIZE_FIGURES
     - PLOT_OPTIMIZE_FIGURES
+    - PLOT_OPTIMIZE_MODE
+    - PLOT_PNGQUANT_QUALITY
+    - PLOT_WEBP_FIGURES
+    - PLOT_WEBP_QUALITY
+    - PLOT_PDF_JPEG_FIGURES
+    - PLOT_JPEG_QUALITY
+    - PLOT_JPEG_SAMPLING_FACTOR

@@ -131,7 +131,100 @@ short_error <- function(x) {
   if (!nzchar(x)) "unknown error" else substr(x, 1L, 240L)
 }
 
-optimize_png_file <- function(file, output_dir, convert_bin = Sys.which("convert")) {
+empty_optimization_log <- function() {
+  data.frame(
+    file = character(),
+    original_bytes = numeric(),
+    optimized_bytes = numeric(),
+    candidate_bytes = numeric(),
+    saved_bytes = numeric(),
+    optimized = logical(),
+    method = character(),
+    webp_file = character(),
+    webp_bytes = numeric(),
+    webp_saved_bytes = numeric(),
+    webp_created = logical(),
+    pdf_file = character(),
+    pdf_bytes = numeric(),
+    pdf_saved_bytes = numeric(),
+    pdf_created = logical(),
+    reason = character(),
+    stringsAsFactors = FALSE
+  )
+}
+
+pngquant_quality <- function(value = env("PLOT_PNGQUANT_QUALITY", "60-85")) {
+  value <- trimws(as.character(value %||% "60-85"))
+  if (!grepl("^[0-9]{1,3}-[0-9]{1,3}$", value)) {
+    return("60-85")
+  }
+  parts <- suppressWarnings(as.integer(strsplit(value, "-", fixed = TRUE)[[1]]))
+  if (length(parts) != 2L || any(!is.finite(parts)) || any(parts < 0L) || any(parts > 100L) || parts[[1]] > parts[[2]]) {
+    return("60-85")
+  }
+  value
+}
+
+webp_quality <- function(value = env("PLOT_WEBP_QUALITY", "72")) {
+  value <- suppressWarnings(as.numeric(value))
+  if (!is.finite(value) || value < 1 || value > 100) 72 else value
+}
+
+jpeg_quality <- function(value = env("PLOT_JPEG_QUALITY", "82")) {
+  value <- suppressWarnings(as.numeric(value))
+  if (!is.finite(value) || value < 1 || value > 100) 82 else value
+}
+
+jpeg_sampling_factor <- function(value = env("PLOT_JPEG_SAMPLING_FACTOR", "4:2:0")) {
+  value <- trimws(as.character(value %||% "4:2:0"))
+  if (value %in% c("4:4:4", "4:2:2", "4:2:0")) value else "4:2:0"
+}
+
+pngquant_speed <- function(value = env("PLOT_PNGQUANT_SPEED", "1")) {
+  value <- suppressWarnings(as.integer(value))
+  if (!is.finite(value) || value < 1L || value > 11L) 1L else value
+}
+
+optimizer_mode <- function(value = env("PLOT_OPTIMIZE_MODE", "lossy")) {
+  value <- tolower(trimws(as.character(value %||% "lossy")))
+  value <- gsub("[^a-z0-9]+", "-", value)
+  aliases <- c(
+    lossy = "lossy",
+    pngquant = "lossy",
+    small = "lossy",
+    max = "lossy",
+    lossless = "lossless",
+    imagemagick = "lossless",
+    convert = "lossless",
+    off = "none",
+    none = "none",
+    false = "none",
+    "0" = "none"
+  )
+  if (value %in% names(aliases)) aliases[[value]] else "lossy"
+}
+
+replace_if_smaller <- function(file, tmp, before, row, method, reason) {
+  candidate_bytes <- suppressWarnings(file.info(tmp)$size)
+  if (!is.finite(candidate_bytes) || candidate_bytes <= 0) {
+    return(row(FALSE, method, candidate_bytes, "optimizer produced an empty file"))
+  }
+  if (candidate_bytes >= before) {
+    return(row(FALSE, method, candidate_bytes, "already optimal or candidate larger"))
+  }
+  ok <- file.copy(tmp, file, overwrite = TRUE)
+  if (!isTRUE(ok)) {
+    return(row(FALSE, method, candidate_bytes, "could not replace original file"))
+  }
+  row(TRUE, method, candidate_bytes, reason)
+}
+
+optimize_png_file <- function(file,
+                              output_dir,
+                              mode = optimizer_mode(),
+                              quality = pngquant_quality(),
+                              pngquant_bin = Sys.which("pngquant"),
+                              convert_bin = Sys.which("convert")) {
   root <- normalizePath(output_dir, winslash = "/", mustWork = FALSE)
   full_file <- normalizePath(file, winslash = "/", mustWork = FALSE)
   rel_file <- if (startsWith(full_file, paste0(root, "/"))) {
@@ -140,7 +233,7 @@ optimize_png_file <- function(file, output_dir, convert_bin = Sys.which("convert
     basename(full_file)
   }
   before <- suppressWarnings(file.info(file)$size)
-  row <- function(optimized, candidate_bytes, reason) {
+  row <- function(optimized, method, candidate_bytes, reason) {
     after <- if (isTRUE(optimized)) candidate_bytes else before
     data.frame(
       file = rel_file,
@@ -149,25 +242,185 @@ optimize_png_file <- function(file, output_dir, convert_bin = Sys.which("convert
       candidate_bytes = candidate_bytes,
       saved_bytes = if (isTRUE(optimized)) before - after else 0,
       optimized = isTRUE(optimized),
+      method = method,
       reason = reason,
       stringsAsFactors = FALSE
     )
   }
   if (!is.finite(before) || before <= 0) {
-    return(row(FALSE, NA_real_, "missing or empty file"))
+    return(row(FALSE, "none", NA_real_, "missing or empty file"))
   }
-  if (!nzchar(convert_bin)) {
-    return(row(FALSE, NA_real_, "ImageMagick convert unavailable"))
+
+  mode <- optimizer_mode(mode)
+  if (identical(mode, "none")) {
+    return(row(FALSE, "none", NA_real_, "optimization disabled"))
   }
 
   tmp <- tempfile(pattern = paste0(tools::file_path_sans_ext(basename(file)), "-"), fileext = ".png")
   on.exit(unlink(tmp), add = TRUE)
+
+  if (identical(mode, "lossy") && nzchar(pngquant_bin)) {
+    args <- c(
+      "--force",
+      "--strip",
+      "--speed", as.character(pngquant_speed()),
+      "--quality", quality,
+      "--output", tmp,
+      normalizePath(file, winslash = "/", mustWork = TRUE)
+    )
+    output <- tryCatch(
+      system2(pngquant_bin, args, stdout = TRUE, stderr = TRUE),
+      error = function(e) structure(conditionMessage(e), status = 1L)
+    )
+    status <- attr(output, "status") %||% 0L
+    if (identical(as.integer(status), 0L) && file.exists(tmp)) {
+      return(replace_if_smaller(file, tmp, before, row, "pngquant", paste0("lossy PNG quality ", quality)))
+    }
+    pngquant_message <- short_error(output)
+  } else {
+    pngquant_message <- "pngquant unavailable"
+  }
+
+  if (nzchar(convert_bin)) {
+    unlink(tmp)
+    input <- normalizePath(file, winslash = "/", mustWork = TRUE)
+    args <- if (identical(mode, "lossy")) {
+      c(input, "-strip", "-colors", "256", paste0("PNG8:", tmp))
+    } else {
+      c(
+        input,
+        "-strip",
+        "-define", "png:compression-level=9",
+        "-define", "png:compression-filter=5",
+        "-define", "png:compression-strategy=1",
+        tmp
+      )
+    }
+    output <- tryCatch(
+      system2(convert_bin, args, stdout = TRUE, stderr = TRUE),
+      error = function(e) structure(conditionMessage(e), status = 1L)
+    )
+    status <- attr(output, "status") %||% 0L
+    if (!identical(as.integer(status), 0L) || !file.exists(tmp)) {
+      return(row(FALSE, "imagemagick", NA_real_, short_error(output)))
+    }
+    method <- if (identical(mode, "lossy")) "imagemagick-png8" else "imagemagick"
+    reason <- if (identical(mode, "lossy")) "lossy PNG8 palette fallback" else "lossless PNG strip/recompress"
+    return(replace_if_smaller(file, tmp, before, row, method, reason))
+  }
+
+  row(FALSE, "none", NA_real_, paste("pngquant/ImageMagick unavailable:", pngquant_message))
+}
+
+create_webp_file <- function(file,
+                             output_dir,
+                             quality = webp_quality(),
+                             cwebp_bin = Sys.which("cwebp")) {
+  root <- normalizePath(output_dir, winslash = "/", mustWork = FALSE)
+  full_file <- normalizePath(file, winslash = "/", mustWork = FALSE)
+  rel_file <- if (startsWith(full_file, paste0(root, "/"))) {
+    substr(full_file, nchar(root) + 2L, nchar(full_file))
+  } else {
+    basename(full_file)
+  }
+  target <- sub("[.][Pp][Nn][Gg]$", ".webp", file)
+  rel_target <- sub("[.][Pp][Nn][Gg]$", ".webp", rel_file)
+  before <- suppressWarnings(file.info(file)$size)
+  row <- function(created, bytes, reason) {
+    data.frame(
+      file = rel_file,
+      webp_file = rel_target,
+      webp_bytes = bytes,
+      webp_saved_bytes = if (isTRUE(created) && is.finite(before)) before - bytes else 0,
+      webp_created = isTRUE(created),
+      webp_reason = reason,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (!is.finite(before) || before <= 0) {
+    return(row(FALSE, NA_real_, "missing or empty PNG source"))
+  }
+  if (!nzchar(cwebp_bin)) {
+    return(row(FALSE, NA_real_, "cwebp unavailable"))
+  }
+  tmp <- tempfile(pattern = paste0(tools::file_path_sans_ext(basename(file)), "-"), fileext = ".webp")
+  on.exit(unlink(tmp), add = TRUE)
+  args <- c(
+    "-quiet",
+    "-preset", "drawing",
+    "-q", as.character(quality),
+    "-m", "6",
+    "-mt",
+    "-sharp_yuv",
+    normalizePath(file, winslash = "/", mustWork = TRUE),
+    "-o", tmp
+  )
+  output <- tryCatch(
+    system2(cwebp_bin, args, stdout = TRUE, stderr = TRUE),
+    error = function(e) structure(conditionMessage(e), status = 1L)
+  )
+  status <- attr(output, "status") %||% 0L
+  if (!identical(as.integer(status), 0L) || !file.exists(tmp)) {
+    return(row(FALSE, NA_real_, short_error(output)))
+  }
+  candidate_bytes <- suppressWarnings(file.info(tmp)$size)
+  if (!is.finite(candidate_bytes) || candidate_bytes <= 0) {
+    return(row(FALSE, candidate_bytes, "cwebp produced an empty file"))
+  }
+  if (candidate_bytes >= before) {
+    unlink(target)
+    return(row(FALSE, candidate_bytes, "WebP candidate larger than PNG"))
+  }
+  ok <- file.copy(tmp, target, overwrite = TRUE)
+  if (!isTRUE(ok)) {
+    return(row(FALSE, candidate_bytes, "could not write WebP file"))
+  }
+  row(TRUE, candidate_bytes, paste0("WebP quality ", quality))
+}
+
+create_pdf_jpeg_file <- function(file,
+                                 output_dir,
+                                 quality = jpeg_quality(),
+                                 sampling_factor = jpeg_sampling_factor(),
+                                 convert_bin = Sys.which("convert")) {
+  root <- normalizePath(output_dir, winslash = "/", mustWork = FALSE)
+  full_file <- normalizePath(file, winslash = "/", mustWork = FALSE)
+  rel_file <- if (startsWith(full_file, paste0(root, "/"))) {
+    substr(full_file, nchar(root) + 2L, nchar(full_file))
+  } else {
+    basename(full_file)
+  }
+  target <- sub("[.][Pp][Nn][Gg]$", ".jpg", file)
+  rel_target <- sub("[.][Pp][Nn][Gg]$", ".jpg", rel_file)
+  before <- suppressWarnings(file.info(file)$size)
+  row <- function(created, bytes, reason) {
+    data.frame(
+      file = rel_file,
+      pdf_file = rel_target,
+      pdf_bytes = bytes,
+      pdf_saved_bytes = if (isTRUE(created) && is.finite(before)) before - bytes else 0,
+      pdf_created = isTRUE(created),
+      pdf_reason = reason,
+      stringsAsFactors = FALSE
+    )
+  }
+  if (!is.finite(before) || before <= 0) {
+    return(row(FALSE, NA_real_, "missing or empty PNG source"))
+  }
+  if (!nzchar(convert_bin)) {
+    return(row(FALSE, NA_real_, "ImageMagick convert unavailable"))
+  }
+  tmp <- tempfile(pattern = paste0(tools::file_path_sans_ext(basename(file)), "-"), fileext = ".jpg")
+  on.exit(unlink(tmp), add = TRUE)
   args <- c(
     normalizePath(file, winslash = "/", mustWork = TRUE),
+    "-background", "white",
+    "-alpha", "remove",
+    "-alpha", "off",
     "-strip",
-    "-define", "png:compression-level=9",
-    "-define", "png:compression-filter=5",
-    "-define", "png:compression-strategy=1",
+    "-interlace", "Plane",
+    "-sampling-factor", sampling_factor,
+    "-quality", as.character(quality),
     tmp
   )
   output <- tryCatch(
@@ -178,34 +431,25 @@ optimize_png_file <- function(file, output_dir, convert_bin = Sys.which("convert
   if (!identical(as.integer(status), 0L) || !file.exists(tmp)) {
     return(row(FALSE, NA_real_, short_error(output)))
   }
-
   candidate_bytes <- suppressWarnings(file.info(tmp)$size)
   if (!is.finite(candidate_bytes) || candidate_bytes <= 0) {
-    return(row(FALSE, candidate_bytes, "optimizer produced an empty file"))
+    return(row(FALSE, candidate_bytes, "JPEG conversion produced an empty file"))
   }
   if (candidate_bytes >= before) {
-    return(row(FALSE, candidate_bytes, "already optimal or candidate larger"))
+    unlink(target)
+    return(row(FALSE, candidate_bytes, "JPEG candidate larger than PNG"))
   }
-  ok <- file.copy(tmp, file, overwrite = TRUE)
+  ok <- file.copy(tmp, target, overwrite = TRUE)
   if (!isTRUE(ok)) {
-    return(row(FALSE, candidate_bytes, "could not replace original file"))
+    return(row(FALSE, candidate_bytes, "could not write JPEG file"))
   }
-  row(TRUE, candidate_bytes, "lossless PNG strip/recompress")
+  row(TRUE, candidate_bytes, paste0("JPEG quality ", quality, ", sampling ", sampling_factor))
 }
 
 optimize_plot_figures <- function(output_dir, enabled = TRUE) {
   log_file <- file.path(output_dir, "figure-optimization.csv")
   if (!isTRUE(enabled)) {
-    result <- data.frame(
-      file = character(),
-      original_bytes = numeric(),
-      optimized_bytes = numeric(),
-      candidate_bytes = numeric(),
-      saved_bytes = numeric(),
-      optimized = logical(),
-      reason = character(),
-      stringsAsFactors = FALSE
-    )
+    result <- empty_optimization_log()
     utils::write.csv(result, log_file, row.names = FALSE)
     message("Figure optimization disabled; wrote empty figure-optimization.csv.")
     return(result)
@@ -218,30 +462,76 @@ optimize_plot_figures <- function(output_dir, enabled = TRUE) {
     character()
   }
   if (!length(files)) {
-    result <- data.frame(
-      file = character(),
-      original_bytes = numeric(),
-      optimized_bytes = numeric(),
-      candidate_bytes = numeric(),
-      saved_bytes = numeric(),
-      optimized = logical(),
-      reason = character(),
-      stringsAsFactors = FALSE
-    )
+    result <- empty_optimization_log()
     utils::write.csv(result, log_file, row.names = FALSE)
     message("No PNG report figures found for optimization.")
     return(result)
   }
 
+  mode <- optimizer_mode()
+  quality <- pngquant_quality()
+  webp_enabled <- truthy_env("PLOT_WEBP_FIGURES", TRUE)
+  pdf_jpeg_enabled <- truthy_env("PLOT_PDF_JPEG_FIGURES", TRUE)
+  webp_q <- webp_quality()
+  jpeg_q <- jpeg_quality()
+  jpeg_sampling <- jpeg_sampling_factor()
+  pngquant_bin <- Sys.which("pngquant")
   convert_bin <- Sys.which("convert")
-  rows <- lapply(files, optimize_png_file, output_dir = output_dir, convert_bin = convert_bin)
-  result <- bind_rows_fill(rows)
+  png_rows <- lapply(
+    files,
+    optimize_png_file,
+    output_dir = output_dir,
+    mode = mode,
+    quality = quality,
+    pngquant_bin = pngquant_bin,
+    convert_bin = convert_bin
+  )
+  png_result <- bind_rows_fill(png_rows)
+  if (isTRUE(webp_enabled)) {
+    webp_rows <- lapply(files, create_webp_file, output_dir = output_dir, quality = webp_q, cwebp_bin = Sys.which("cwebp"))
+    webp_result <- bind_rows_fill(webp_rows)
+    result <- merge(png_result, webp_result, by = "file", all = TRUE, sort = FALSE)
+  } else {
+    webp_result <- empty_optimization_log()
+    result <- png_result
+    result$webp_file <- ""
+    result$webp_bytes <- NA_real_
+    result$webp_saved_bytes <- 0
+    result$webp_created <- FALSE
+    result$webp_reason <- "WebP disabled"
+  }
+  if (isTRUE(pdf_jpeg_enabled)) {
+    jpeg_rows <- lapply(
+      files,
+      create_pdf_jpeg_file,
+      output_dir = output_dir,
+      quality = jpeg_q,
+      sampling_factor = jpeg_sampling,
+      convert_bin = convert_bin
+    )
+    jpeg_result <- bind_rows_fill(jpeg_rows)
+    result <- merge(result, jpeg_result, by = "file", all = TRUE, sort = FALSE)
+  } else {
+    result$pdf_file <- ""
+    result$pdf_bytes <- NA_real_
+    result$pdf_saved_bytes <- 0
+    result$pdf_created <- FALSE
+    result$pdf_reason <- "PDF JPEG disabled"
+  }
   utils::write.csv(result, log_file, row.names = FALSE)
   saved <- sum(result$saved_bytes, na.rm = TRUE)
   optimized <- sum(result$optimized, na.rm = TRUE)
+  webp_saved <- sum(result$webp_saved_bytes, na.rm = TRUE)
+  webp_created <- sum(result$webp_created, na.rm = TRUE)
+  pdf_saved <- sum(result$pdf_saved_bytes, na.rm = TRUE)
+  pdf_created <- sum(result$pdf_created, na.rm = TRUE)
   message(
     "Optimized ", optimized, " PNG figure(s); saved ",
-    format(round(saved / 1024 / 1024, 2), nsmall = 2), " MB losslessly."
+    format(round(saved / 1024 / 1024, 2), nsmall = 2), " MB using ",
+    mode, " mode. Created ", webp_created, " WebP sidecar(s); HTML can save ",
+    format(round(webp_saved / 1024 / 1024, 2), nsmall = 2), " MB. Created ",
+    pdf_created, " PDF JPEG sidecar(s); PDF can save ",
+    format(round(pdf_saved / 1024 / 1024, 2), nsmall = 2), " MB."
   )
   invisible(result)
 }
