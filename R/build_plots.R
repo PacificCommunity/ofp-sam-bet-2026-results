@@ -88,6 +88,38 @@ write_plot_summary <- function(result, payload_index, output_dir) {
   invisible(summary)
 }
 
+organize_review_outputs <- function(output_dir,
+                                    html_file = "plot-report.html",
+                                    qmd_file = "plot-report.qmd") {
+  review_dir <- file.path(output_dir, "_review")
+  dir.create(review_dir, recursive = TRUE, showWarnings = FALSE)
+  copied <- character()
+  for (file in c(html_file, qmd_file, "mfclshiny-report-files.csv", "plot-summary.csv")) {
+    source <- file.path(output_dir, file)
+    if (!file.exists(source)) next
+    target <- file.path(review_dir, basename(file))
+    file.copy(source, target, overwrite = TRUE)
+    copied <- c(copied, target)
+  }
+  readme <- file.path(review_dir, "README.txt")
+  writeLines(
+    c(
+      "BET plot review outputs",
+      "",
+      "Open plot-report.html first when reviewing this Kflow plot job.",
+      "The full figure bundle remains under ../figures and table outputs under ../tables.",
+      "",
+      paste("Files copied:", length(copied))
+    ),
+    readme
+  )
+  invisible(data.frame(
+    file = basename(c(copied, readme)),
+    path = normalizePath(c(copied, readme), winslash = "/", mustWork = FALSE),
+    stringsAsFactors = FALSE
+  ))
+}
+
 input_dir <- env("INPUT_DIR", "inputs")
 out_dir <- env("OUTPUT_DIR", "outputs")
 title <- env("PLOT_TITLE", "BET 2026 report-ready figures")
@@ -142,6 +174,7 @@ if (is.null(result) || !is.data.frame(result$figures) || !nrow(result$figures)) 
 }
 
 write_plot_summary(result, payload_index, out_dir)
+organize_review_outputs(out_dir)
 
 message("Wrote ", length(unique(result$figures$figure)), " report-ready mfclshiny figure(s).")
 if (is.data.frame(result$log) && any(result$log$status == "error", na.rm = TRUE)) {
