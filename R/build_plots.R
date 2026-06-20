@@ -450,7 +450,8 @@ write_clean_indices_and_review <- function(result,
                                            title,
                                            species_code,
                                            species_label,
-                                           assessment_year) {
+                                           assessment_year,
+                                           render_html = FALSE) {
   result$figures <- polish_output_metadata(result$figures %||% data.frame())
   result$tables <- polish_output_metadata(result$tables %||% data.frame())
   if (nrow(result$figures)) {
@@ -471,7 +472,7 @@ write_clean_indices_and_review <- function(result,
     assessment_year = assessment_year,
     qmd_file = "plot-report.qmd",
     html_file = "plot-report.html",
-    render_html = TRUE,
+    render_html = isTRUE(render_html),
     figure_log = result$log %||% NULL,
     table_log = result$table_log %||% NULL
   )
@@ -506,8 +507,8 @@ organize_review_outputs <- function(output_dir,
     c(
       "BET plot review outputs",
       "",
-      "Open plot-report.html first when reviewing this Kflow plot job.",
-      "Open report-map.html to see the report-ready QMD map used by the report task.",
+      "Open report-map.html first to review report-ready figures and QMD markers.",
+      "plot-report.qmd is kept as a detailed review source. plot-report.html is only present when PLOT_RENDER_REVIEW_HTML=true.",
       "The full figure bundle remains under ../figures and table outputs under ../tables.",
       "",
       paste("Files copied:", length(copied))
@@ -939,10 +940,12 @@ species_code <- env("FLOW_SPECIES", "BET")
 species_label <- env("FLOW_SPECIES_LABEL", "bigeye tuna")
 assessment_year <- env("FLOW_ASSESSMENT_YEAR", "2026")
 optimize_figures <- truthy_env("PLOT_OPTIMIZE_FIGURES", TRUE)
+render_review_html <- truthy_env("PLOT_RENDER_REVIEW_HTML", FALSE)
 max_fisheries <- suppressWarnings(as.integer(env("PLOT_MAX_FISHERIES", "18")))
 if (!is.finite(max_fisheries) || max_fisheries < 1L) max_fisheries <- 18L
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+unlink(file.path(out_dir, c("plot-report.html", "_review/plot-report.html")), force = TRUE)
 
 payload_index <- payloads(input_dir)
 if (!nrow(payload_index)) {
@@ -969,7 +972,7 @@ result <- call_with_supported_args(
     formats = "png",
     build_payloads = FALSE,
     overwrite = TRUE,
-    render_html = TRUE,
+    render_html = FALSE,
     qmd_file = "plot-report.qmd",
     html_file = "plot-report.html",
     figure_dir = "figures",
@@ -992,7 +995,8 @@ result <- write_clean_indices_and_review(
   title = title,
   species_code = species_code,
   species_label = species_label,
-  assessment_year = assessment_year
+  assessment_year = assessment_year,
+  render_html = render_review_html
 )
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
