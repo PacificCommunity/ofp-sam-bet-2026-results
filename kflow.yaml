@@ -15,6 +15,17 @@ exclude_machines:
   - nouofpcand19
 
 env:
+  JOB_TITLE: BET results
+  JOB_DESCRIPTION: Build report-ready figures and tables from upstream model payloads.
+  JOB_KEY: results
+  FLOW_GROUP: bet-2026-base
+  PLOT_TITLE: BET 2026 report-ready figures
+  PLOT_MAX_FISHERIES: "18"
+  FLOW_SPECIES: BET
+  FLOW_SPECIES_LABEL: bigeye tuna
+  FLOW_ASSESSMENT_YEAR: "2026"
+  REPORT_QMD: assessment-report.qmd
+  REPORT_FILE_STEM: bet-2026-report
   KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "true"
   KFLOW_RUNTIME_UPDATE: auto
   KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@9bd29ff
@@ -30,6 +41,12 @@ env:
   PLOT_PDF_JPEG_FIGURES: "true"
   PLOT_JPEG_QUALITY: "82"
   PLOT_JPEG_SAMPLING_FACTOR: "4:2:0"
+  KFLOW_REPORT_COMMIT_GENERATED: "true"
+  KFLOW_REPORT_PUSH_GENERATED: "true"
+  KFLOW_REPORT_PUBLISH_REQUIRED: "true"
+input_jobs:
+  - report: ofp-sam-bet-2026-stepwise
+    latest: 1
 output_patterns:
   - outputs/**
 triggers:
@@ -40,22 +57,40 @@ triggers:
         - "{{ job.id }}"
       env:
         FLOW_GROUP: "{{ job.config.FLOW_GROUP }}"
-        JOB_TITLE: BET report from results
-        RUN_LABEL: "report-from-{{ job.id }}"
+        JOB_TITLE: BET report
+        JOB_KEY: report
+        JOB_DESCRIPTION: Render the assessment report from generated BET results.
         RESULTS_JOB_ID: "{{ job.id }}"
         RESULTS_JOB_IDS: "{{ job.id }}"
+        FLOW_SPECIES: "{{ job.config.FLOW_SPECIES }}"
+        FLOW_SPECIES_LABEL: "{{ job.config.FLOW_SPECIES_LABEL }}"
+        FLOW_ASSESSMENT_YEAR: "{{ job.config.FLOW_ASSESSMENT_YEAR }}"
+        REPORT_QMD: "{{ job.config.REPORT_QMD }}"
+        REPORT_FILE_STEM: "{{ job.config.REPORT_FILE_STEM }}"
+        KFLOW_REPORT_COMMIT_GENERATED: "{{ job.config.KFLOW_REPORT_COMMIT_GENERATED }}"
+        KFLOW_REPORT_PUSH_GENERATED: "{{ job.config.KFLOW_REPORT_PUSH_GENERATED }}"
+        KFLOW_REPORT_PUBLISH_REQUIRED: "{{ job.config.KFLOW_REPORT_PUBLISH_REQUIRED }}"
       tags:
         auto: "true"
         stage: report
 job_config:
   optional:
-    - RUN_LABEL
-    - JOB_TITLE
+    - TRIGGER_NEXT
     - FLOW_GROUP
+    - JOB_TITLE
+    - JOB_DESCRIPTION
+    - JOB_KEY
     - PLOT_TITLE
+    - PLOT_MAX_FISHERIES
     - FLOW_SPECIES
     - FLOW_SPECIES_LABEL
     - FLOW_ASSESSMENT_YEAR
+    - REPORT_QMD
+    - REPORT_FILE_STEM
+    - KFLOW_REPORT_COMMIT_GENERATED
+    - KFLOW_REPORT_PUSH_GENERATED
+    - KFLOW_REPORT_PUBLISH_REQUIRED
+    - REPORT_READY_PATH_PREFIX
     - KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES
     - KFLOW_RUNTIME_UPDATE
     - KFLOW_RUNTIME_PACKAGES
@@ -66,6 +101,7 @@ job_config:
     - PLOT_OPTIMIZE_FIGURES
     - PLOT_OPTIMIZE_MODE
     - PLOT_PNGQUANT_QUALITY
+    - PLOT_PNGQUANT_SPEED
     - PLOT_WEBP_FIGURES
     - PLOT_WEBP_QUALITY
     - PLOT_PDF_JPEG_FIGURES
