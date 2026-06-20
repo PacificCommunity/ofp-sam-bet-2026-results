@@ -34,6 +34,8 @@ triggers:
         FLOW_GROUP: "{{ job.config.FLOW_GROUP }}"
         JOB_TITLE: BET curation from outputs
         RUN_LABEL: "curation-from-{{ job.id }}"
+        OUTPUTS_JOB_ID: "{{ job.id }}"
+        OUTPUTS_JOB_IDS: "{{ job.id }}"
       tags:
         auto: "true"
         stage: curation
