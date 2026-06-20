@@ -93,6 +93,81 @@ write_plot_summary <- function(result, payload_index, output_dir) {
   invisible(summary)
 }
 
+polish_output_caption <- function(x) {
+  x <- as.character(x)
+  x[is.na(x)] <- ""
+  x <- gsub("\\s+", " ", x)
+  x <- gsub(
+    "\\s+(for|in|from|of|used in) the [0-9]{4}\\s+bigeye tuna\\s*(\\(BET\\))?\\s+assessment\\b",
+    "",
+    x,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+  x <- gsub(
+    "^the [0-9]{4}\\s+bigeye tuna\\s*(\\(BET\\))?\\s+assessment\\s+",
+    "",
+    x,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+  x <- gsub(
+    "\\bthe [0-9]{4}\\s+bigeye tuna\\s*(\\(BET\\))?\\s+assessment\\b",
+    "",
+    x,
+    ignore.case = TRUE,
+    perl = TRUE
+  )
+  x <- gsub("\\s+([.,;:])", "\\1", x, perl = TRUE)
+  x <- trimws(gsub("\\s+", " ", x))
+  ifelse(nzchar(x), paste0(toupper(substr(x, 1, 1)), substr(x, 2, nchar(x))), x)
+}
+
+polish_output_metadata <- function(x) {
+  if (!is.data.frame(x) || !nrow(x)) return(x)
+  text_cols <- unique(c(
+    grep("caption", names(x), ignore.case = TRUE, value = TRUE),
+    intersect(c("alt_text", "description"), names(x))
+  ))
+  for (col in text_cols) {
+    x[[col]] <- polish_output_caption(x[[col]])
+  }
+  x
+}
+
+write_clean_indices_and_review <- function(result,
+                                           output_dir,
+                                           title,
+                                           species_code,
+                                           species_label,
+                                           assessment_year) {
+  result$figures <- polish_output_metadata(result$figures %||% data.frame())
+  result$tables <- polish_output_metadata(result$tables %||% data.frame())
+  if (nrow(result$figures)) {
+    utils::write.csv(result$figures, file.path(output_dir, "mfclshiny-figure-index.csv"), row.names = FALSE)
+    utils::write.csv(result$figures, file.path(output_dir, "figure-index.csv"), row.names = FALSE)
+  }
+  if (nrow(result$tables)) {
+    utils::write.csv(result$tables, file.path(output_dir, "mfclshiny-table-index.csv"), row.names = FALSE)
+    utils::write.csv(result$tables, file.path(output_dir, "table-index.csv"), row.names = FALSE)
+  }
+  mfclshiny::write_report_figure_review(
+    figure_index = result$figures,
+    table_index = result$tables,
+    output_dir = output_dir,
+    title = title,
+    species_code = species_code,
+    species_label = species_label,
+    assessment_year = assessment_year,
+    qmd_file = "plot-report.qmd",
+    html_file = "plot-report.html",
+    render_html = TRUE,
+    figure_log = result$log %||% NULL,
+    table_log = result$table_log %||% NULL
+  )
+  result
+}
+
 organize_review_outputs <- function(output_dir,
                                     html_file = "plot-report.html",
                                     qmd_file = "plot-report.qmd") {
@@ -590,6 +665,14 @@ if (is.null(result) || !is.data.frame(result$figures) || !nrow(result$figures)) 
   stop("mfclshiny Shiny registry export produced no report-ready figures.", call. = FALSE)
 }
 
+result <- write_clean_indices_and_review(
+  result = result,
+  output_dir = out_dir,
+  title = title,
+  species_code = species_code,
+  species_label = species_label,
+  assessment_year = assessment_year
+)
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
 organize_review_outputs(out_dir)

@@ -142,7 +142,7 @@ prepare_runtime_packages() {
 
 mkdir -p "${OUT_DIR}" "${INPUT_DIR}"
 
-echo "BET plot task"
+echo "BET outputs task"
 echo "Input directory: ${INPUT_DIR}"
 echo "Output directory: ${OUT_DIR}"
 

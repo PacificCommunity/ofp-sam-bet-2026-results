@@ -1,5 +1,5 @@
-name: ofp-sam-bet-2026-plot
-description: Build report-ready BET 2026 plots from stepwise model payloads.
+name: ofp-sam-bet-2026-outputs
+description: Build report-ready BET 2026 figure and table outputs from stepwise model payloads.
 command: bash run.sh
 docker_image: ghcr.io/pacificcommunity/tuna-flow:v1.6
 resources:
@@ -26,30 +26,17 @@ output_patterns:
   - outputs/**
 triggers:
   on_success:
-    - key: report-from-plot
-      report: ofp-sam-bet-2026-report
+    - key: curation-from-outputs
+      report: ofp-sam-bet-2026-curation
       input_jobs:
         - "{{ job.id }}"
       env:
         FLOW_GROUP: "{{ job.config.FLOW_GROUP }}"
-        JOB_TITLE: BET report from plots
-        RUN_LABEL: "report-from-{{ job.id }}"
-        KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "true"
-        KFLOW_RUNTIME_UPDATE: auto
-        KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@9bd29ff
-        KFLOW_RUNTIME_GITHUB_AUTH: "true"
-        KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
-        PLOT_OPTIMIZE_FIGURES: "true"
-        PLOT_OPTIMIZE_MODE: lossy
-        PLOT_PNGQUANT_QUALITY: "60-85"
-        PLOT_WEBP_FIGURES: "true"
-        PLOT_WEBP_QUALITY: "72"
-        PLOT_PDF_JPEG_FIGURES: "true"
-        PLOT_JPEG_QUALITY: "82"
-        PLOT_JPEG_SAMPLING_FACTOR: "4:2:0"
+        JOB_TITLE: BET curation from outputs
+        RUN_LABEL: "curation-from-{{ job.id }}"
       tags:
         auto: "true"
-        stage: report
+        stage: curation
 job_config:
   optional:
     - RUN_LABEL
