@@ -1,5 +1,5 @@
-name: ofp-sam-bet-2026-outputs
-description: Build report-ready BET 2026 figure and table outputs from upstream model-output payloads.
+name: ofp-sam-bet-2026-results
+description: Build report-ready BET 2026 figures, tables, and report section seeds from upstream model payloads.
 command: bash run.sh
 docker_image: ghcr.io/pacificcommunity/tuna-flow:v1.6
 resources:
@@ -34,16 +34,16 @@ output_patterns:
   - outputs/**
 triggers:
   on_success:
-    - key: report-from-outputs
+    - key: report-from-results
       report: ofp-sam-bet-2026-report
       input_jobs:
         - "{{ job.id }}"
       env:
         FLOW_GROUP: "{{ job.config.FLOW_GROUP }}"
-        JOB_TITLE: BET report from outputs
+        JOB_TITLE: BET report from results
         RUN_LABEL: "report-from-{{ job.id }}"
-        OUTPUTS_JOB_ID: "{{ job.id }}"
-        OUTPUTS_JOB_IDS: "{{ job.id }}"
+        RESULTS_JOB_ID: "{{ job.id }}"
+        RESULTS_JOB_IDS: "{{ job.id }}"
       tags:
         auto: "true"
         stage: report
