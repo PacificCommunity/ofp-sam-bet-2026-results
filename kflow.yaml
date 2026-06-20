@@ -34,19 +34,19 @@ output_patterns:
   - outputs/**
 triggers:
   on_success:
-    - key: curation-from-outputs
-      report: ofp-sam-bet-2026-curation
+    - key: report-from-outputs
+      report: ofp-sam-bet-2026-report
       input_jobs:
         - "{{ job.id }}"
       env:
         FLOW_GROUP: "{{ job.config.FLOW_GROUP }}"
-        JOB_TITLE: BET curation from outputs
-        RUN_LABEL: "curation-from-{{ job.id }}"
+        JOB_TITLE: BET report from outputs
+        RUN_LABEL: "report-from-{{ job.id }}"
         OUTPUTS_JOB_ID: "{{ job.id }}"
         OUTPUTS_JOB_IDS: "{{ job.id }}"
       tags:
         auto: "true"
-        stage: curation
+        stage: report
 job_config:
   optional:
     - RUN_LABEL

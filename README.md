@@ -11,10 +11,20 @@ This task reads one or more upstream model-output jobs, finds
 - `outputs/tables/*.csv`
 - `outputs/figure-index.csv`
 - `outputs/table-index.csv`
+- `outputs/report-ready/figures.qmd`
+- `outputs/report-ready/tables.qmd`
+- `outputs/report-ready/report-map.html`
 
 The `_review/` folder intentionally duplicates the main HTML/QMD review files
-so the report preview is easy to find even when the figure bundle is large.
+and the report-ready map so the useful review files are easy to find even when
+the figure bundle is large.
 
-The outputs bundle is designed to be consumed by
-`ofp-sam-bet-2026-curation`, which selects and orders report figures and tables
-before the report is rendered.
+The outputs bundle is designed to be consumed directly by
+`ofp-sam-bet-2026-report`. The report job copies the generated assets under
+`generated/outputs/` and seeds `sections/Figures.qmd` and `sections/Tables.qmd`
+only when those files are missing, so manual report edits are preserved.
+
+Open `outputs/report-ready/report-map.html` to browse generated figures and
+tables. To change report content, edit the seeded QMD files in the report
+repository: remove blocks, reorder blocks, move appendix material, or rewrite
+captions there.
