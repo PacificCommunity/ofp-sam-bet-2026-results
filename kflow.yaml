@@ -1,7 +1,7 @@
 name: ofp-sam-bet-2026-results
 description: Build report-ready BET 2026 figures, tables, and report section seeds from upstream model payloads.
 command: bash run.sh
-docker_image: ghcr.io/pacificcommunity/tuna-flow:v1.6
+docker_image: ghcr.io/pacificcommunity/tuna-flow:v1.7
 resources:
   cpus: 2
   memory: 12GB
