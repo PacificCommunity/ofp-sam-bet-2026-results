@@ -1,7 +1,14 @@
 # BET 2026 Results
 
+[![Kflow ready task](kflow-ready.svg)](kflow.yaml)
+
 Kflow task repository for BET 2026 report-ready figures, tables, and report
 section seeds.
+
+This repository is Kflow-ready: Kflow discovers and runs it from
+[`kflow.yaml`](kflow.yaml), consumes upstream model payload artifacts, and
+passes report-ready figures, tables, QMD seeds, and provenance to the report
+task.
 
 This task reads one or more upstream model payload jobs, finds
 `model_payload.rds` files, and writes the result bundle:
