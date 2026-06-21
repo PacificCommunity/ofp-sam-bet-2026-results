@@ -4,65 +4,68 @@
   <a href="kflow.yaml"><img src="kflow-ready.svg" alt="Kflow ready task"></a>
 </p>
 
-Kflow task repository for BET 2026 report-ready figures, tables, and report
-section seeds.
+Kflow task for building report-ready BET 2026 figures, tables, captions, and
+QMD section seeds from upstream model payloads.
 
-This repository is Kflow-ready: Kflow discovers and runs it from
-[`kflow.yaml`](kflow.yaml), consumes upstream model payload artifacts, and
-passes report-ready figures, tables, QMD seeds, and provenance to the report
+## Workflow Role
+
+```text
+ofp-sam-bet-2026-stepwise -> ofp-sam-bet-2026-results -> ofp-sam-bet-2026-report
+```
+
+This task reads one or more upstream artifacts containing `model_payload.rds`,
+builds the report figure/table bundle, and passes that bundle to the report
 task.
 
-This task reads one or more upstream model payload jobs, finds
-`model_payload.rds` files, and writes the result bundle:
+## Main Outputs
 
-- `outputs/figures/*.png`
-- `outputs/tables/*.csv`
-- `outputs/figure-index.csv`
-- `outputs/table-index.csv`
-- `outputs/report-ready/figures.qmd`
-- `outputs/report-ready/tables.qmd`
-- `outputs/report-ready/report-map.html`
-- `outputs/plot-report.qmd` and `outputs/_review/plot-report.qmd` for
-  detailed review source
+```text
+outputs/figures/
+outputs/tables/
+outputs/figure-index.csv
+outputs/table-index.csv
+outputs/report-ready/figures.qmd
+outputs/report-ready/tables.qmd
+outputs/report-ready/report-map.html
+outputs/plot-report.qmd
+outputs/_review/plot-report.qmd
+outputs/_review/report-map.html
+```
 
-The `_review/` folder intentionally duplicates the QMD review source and the
-report-ready map so useful review files are easy to find in Kflow artifacts
-even when the figure bundle is large. The large `plot-report.html` review is
-not rendered by default; set `PLOT_RENDER_REVIEW_HTML=true` only for a one-off
-interactive review run.
+Open `outputs/report-ready/report-map.html` to browse the generated assets. To
+change report order, inclusion, appendix placement, or captions, edit the seeded
+QMD files in the report repo rather than this results repo.
 
-The results bundle is designed to be consumed directly by
-`ofp-sam-bet-2026-report`. The report job copies the generated assets under
-`generated/outputs/` and seeds `sections/Figures.qmd` and `sections/Tables.qmd`
-only when those files are missing, so manual report edits are preserved. The
-report repository commits only the report-ready QMD, referenced figure/table
-files, and provenance metadata. Results artifacts keep the light report map and
-QMD review source; the large review HTML is opt-in.
+The large self-contained `plot-report.html` review is off by default. Enable it
+only for a one-off review run with `PLOT_RENDER_REVIEW_HTML=true`.
 
-Open `outputs/report-ready/report-map.html` to browse generated figures and
-tables without duplicating all images into a large self-contained HTML file.
-To change report content, edit the seeded QMD files in the report
-repository: remove blocks, reorder blocks, move appendix material, or rewrite
-captions there.
+## Figure Size
 
-## Common Job Config
+Normal Kflow runs optimize generated images for smaller artifacts and smaller
+reports. PNGs remain the fallback; WebP/JPEG sidecars are used where they help
+HTML or PDF output.
 
-These fields are the useful ones to change from Kflow:
+## Run
 
-| Field | Example | Meaning |
+Kflow runs:
+
+```bash
+bash run.sh
+```
+
+For local testing, put upstream model payload artifacts under `inputs/`, then
+run the same command.
+
+## Common Kflow Config
+
+| Field | Typical value | Purpose |
 | --- | --- | --- |
-| `TRIGGER_NEXT` | `false` | Build results only; do not launch the report task. |
-| `FLOW_GROUP` | `bet-2026-base` | Short label shared by one results/report chain. |
-| `JOB_TITLE` | `BET results` | Human title shown in Kflow. |
-| `PLOT_TITLE` | `BET 2026 report-ready figures` | Detailed review title. |
-| `PLOT_MAX_FISHERIES` | `18` | Maximum fishery-level diagnostics to export per registered family. |
-| `PLOT_RENDER_REVIEW_HTML` | `false` | Render the large self-contained `plot-report.html` review. Keep false for normal Kflow runs. |
-| `FLOW_SPECIES` | `BET` | Species code passed into captions and report config. |
-| `FLOW_SPECIES_LABEL` | `bigeye tuna` | Species label passed into captions and report config. |
-| `FLOW_ASSESSMENT_YEAR` | `2026` | Assessment year passed into captions and report config. |
-| `REPORT_QMD` | `assessment-report.qmd` | Report entrypoint to use if the downstream report task runs. |
-| `REPORT_FILE_STEM` | `bet-2026-report` | Output filename stem for the downstream report task. |
-| `PLOT_OPTIMIZE_FIGURES` | `true` | Optimize generated plot files for smaller artifacts and reports. |
+| `TRIGGER_NEXT` | `true` | Launch the report task after results complete. |
+| `FLOW_GROUP` | `bet-2026-base` | Shared label for one stepwise/results/report chain. |
+| `PLOT_MAX_FISHERIES` | `18` | Limit fishery-level diagnostic plots per plot family. |
+| `PLOT_RENDER_REVIEW_HTML` | `false` | Render the large review HTML. Keep false for normal runs. |
+| `PLOT_OPTIMIZE_FIGURES` | `true` | Optimize generated plot files. |
 | `PLOT_PNGQUANT_QUALITY` | `60-85` | Lossy PNG quality range when `pngquant` is available. |
 | `PLOT_WEBP_QUALITY` | `72` | WebP sidecar quality for HTML. |
 | `PLOT_JPEG_QUALITY` | `82` | JPEG sidecar quality for PDF rendering. |
+| `KFLOW_RUNTIME_PACKAGES` | `mfclshiny=PacificCommunity/mfclshiny@...` | mfclshiny version used for plot generation. |
