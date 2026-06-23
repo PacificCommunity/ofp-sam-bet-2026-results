@@ -22,7 +22,7 @@ env:
   REPORT_FILE_STEM: bet-2026-report
   KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "true"
   KFLOW_RUNTIME_UPDATE: auto
-  KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@9bd29ff
+  KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@a37c551
   KFLOW_RUNTIME_GITHUB_AUTH: "true"
   KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
   MFCLSHINY_REPORT_DPI: "180"
@@ -89,47 +89,18 @@ local_apps:
         }
         remotes::install_github(
           "PacificCommunity/mfclshiny",
-          ref = "9bd29ff",
+          ref = "a37c551",
           lib = lib,
           upgrade = "never",
           quiet = TRUE
         )
       }
 
-      patch_mfclshiny_report_ready <- function() {
-        helpers <- file.path(
-          system.file(package = "mfclshiny"),
-          "app", "R", "server", "report_ready_helpers.R"
-        )
-        if (!file.exists(helpers)) {
-          return(invisible(FALSE))
-        }
-
-        txt <- readLines(helpers, warn = FALSE)
-        original <- txt
-        replace_fixed <- function(x, from, to) {
-          gsub(from, to, x, fixed = TRUE)
-        }
-        txt <- replace_fixed(txt, "registry <- rv$report_ready_plots", "registry <- shiny::isolate(rv$report_ready_plots)")
-        txt <- replace_fixed(txt, "registry <- rv$report_ready_tables", "registry <- shiny::isolate(rv$report_ready_tables)")
-        txt <- replace_fixed(txt, "table_registry <- rv$report_ready_tables", "table_registry <- shiny::isolate(rv$report_ready_tables)")
-        txt <- replace_fixed(
-          txt,
-          "expanded[[variant_id]] <- variant_registry$report_ready_plots[[variant_id]]",
-          "expanded[[variant_id]] <- shiny::isolate(variant_registry$report_ready_plots[[variant_id]])"
-        )
-        if (!identical(txt, original)) {
-          writeLines(txt, helpers, useBytes = TRUE)
-        }
-        invisible(!identical(txt, original))
-      }
-      patch_mfclshiny_report_ready()
-
       dir.create("/kflow/work/export", recursive = TRUE, showWarnings = FALSE)
       mfclshiny::run_mfclshiny(
         model_dir = Sys.getenv("KFLOW_LOCAL_APP_INPUT_DIR", "/kflow/inputs"),
         export_dir = "/kflow/work/export",
-        report_ready_export = FALSE,
+        report_ready_export = TRUE,
         host = "0.0.0.0",
         port = as.integer(Sys.getenv("PORT", "3838")),
         launch.browser = FALSE
@@ -168,6 +139,7 @@ job_config:
     - JOB_KEY
     - PLOT_TITLE
     - PLOT_MAX_FISHERIES
+    - PLOT_REPORT_SELECTION
     - FLOW_SPECIES
     - FLOW_SPECIES_LABEL
     - FLOW_ASSESSMENT_YEAR
@@ -185,6 +157,8 @@ job_config:
     - KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME
     - MFCLSHINY_REPORT_DPI
     - MFCLSHINY_OPTIMIZE_FIGURES
+    - MFCLSHINY_REPORT_SELECTION_FILE
+    - MFCLSHINY_SELECTION_PUBLISH_CMD
     - PLOT_OPTIMIZE_FIGURES
     - PLOT_OPTIMIZE_MODE
     - PLOT_PNGQUANT_QUALITY

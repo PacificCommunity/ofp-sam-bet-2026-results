@@ -67,6 +67,25 @@ payloads <- function(input_dir) {
   bind_rows_fill(rows)
 }
 
+find_report_selection <- function(input_dir) {
+  explicit <- env("PLOT_REPORT_SELECTION", env("MFCLSHINY_REPORT_SELECTION_FILE", ""))
+  candidates <- character()
+  if (nzchar(explicit)) candidates <- c(candidates, explicit)
+  candidates <- c(
+    candidates,
+    file.path(getwd(), "report-selection.json"),
+    file.path(getwd(), "config", "report-selection.json")
+  )
+  if (dir.exists(input_dir)) {
+    candidates <- c(
+      candidates,
+      list.files(input_dir, pattern = "^report-selection[.]json$", recursive = TRUE, full.names = TRUE)
+    )
+  }
+  candidates <- normalizePath(candidates, winslash = "/", mustWork = FALSE)
+  candidates[file.exists(candidates)][1] %||% ""
+}
+
 write_payload_index <- function(payload_index, output_dir) {
   table_dir <- file.path(output_dir, "tables")
   dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
@@ -171,7 +190,7 @@ index_value <- function(row, name, default = "") {
 
 ensure_index_columns <- function(index, id_col) {
   index <- as.data.frame(index %||% data.frame(), stringsAsFactors = FALSE)
-  needed <- c(id_col, "relative_path", "file", "label", "caption", "description", "format", "status")
+  needed <- c(id_col, "relative_path", "file", "label", "caption", "description", "format", "placement", "status")
   for (name in needed) {
     if (!name %in% names(index)) index[[name]] <- ""
   }
@@ -223,9 +242,20 @@ report_figure_ids <- function(figure_index) {
   figure_ids <- figure_ids[nzchar(figure_ids) & !is.na(figure_ids)]
   keep <- vapply(figure_ids, function(id) {
     rows <- figure_index[as.character(figure_index$figure) == id, , drop = FALSE]
-    !excluded_report_figure(rows)
+    placement <- tolower(as.character(rows$placement %||% ""))
+    !all(placement == "exclude", na.rm = TRUE) && !excluded_report_figure(rows)
   }, logical(1))
   figure_ids[keep]
+}
+
+report_item_placement <- function(rows, fallback_appendix = FALSE) {
+  placement <- tolower(as.character(rows$placement %||% ""))
+  placement <- placement[placement %in% c("main", "appendix", "exclude", "auto")]
+  placement <- placement[nzchar(placement)]
+  if (length(placement) && any(placement == "exclude")) return("exclude")
+  if (length(placement) && any(placement == "main")) return("main")
+  if (length(placement) && any(placement == "appendix")) return("appendix")
+  if (isTRUE(fallback_appendix)) "appendix" else "main"
 }
 
 preferred_figure_row <- function(rows, output_dir) {
@@ -258,7 +288,9 @@ write_report_ready_figures_qmd <- function(figure_index, output_dir, ready_dir) 
   groups <- list(main = character(), appendix = character())
   for (id in figure_ids) {
     rows <- figure_index[as.character(figure_index$figure) == id, , drop = FALSE]
-    if (appendix_figure(rows)) groups$appendix <- c(groups$appendix, id) else groups$main <- c(groups$main, id)
+    placement <- report_item_placement(rows, fallback_appendix = appendix_figure(rows))
+    if (identical(placement, "exclude")) next
+    if (identical(placement, "appendix")) groups$appendix <- c(groups$appendix, id) else groups$main <- c(groups$main, id)
   }
 
   lines <- c(
@@ -307,6 +339,10 @@ write_report_ready_tables_qmd <- function(table_index, ready_dir) {
   table_index <- ensure_index_columns(table_index, "table")
   table_ids <- unique(as.character(table_index$table %||% ""))
   table_ids <- table_ids[nzchar(table_ids) & !is.na(table_ids)]
+  table_ids <- table_ids[vapply(table_ids, function(id) {
+    rows <- table_index[as.character(table_index$table) == id, , drop = FALSE]
+    !identical(report_item_placement(rows), "exclude")
+  }, logical(1))]
   lines <- c(
     "# Tables",
     "",
@@ -368,7 +404,9 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, ready_
     preview <- paste0("../", rel)
     label <- index_value(row, "label", id)
     caption <- index_value(row, "caption", label)
-    placement <- if (appendix_figure(rows)) "Appendix" else "Main"
+    placement <- report_item_placement(rows, fallback_appendix = appendix_figure(rows))
+    if (identical(placement, "exclude")) next
+    placement <- if (identical(placement, "appendix")) "Appendix" else "Main"
     marker <- paste0("<!-- figure: ", id, " -->")
     figure_cards <- c(
       figure_cards,
@@ -943,6 +981,7 @@ optimize_figures <- truthy_env("PLOT_OPTIMIZE_FIGURES", TRUE)
 render_review_html <- truthy_env("PLOT_RENDER_REVIEW_HTML", FALSE)
 max_fisheries <- suppressWarnings(as.integer(env("PLOT_MAX_FISHERIES", "18")))
 if (!is.finite(max_fisheries) || max_fisheries < 1L) max_fisheries <- 18L
+selection_file <- find_report_selection(input_dir)
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 unlink(file.path(out_dir, c("plot-report.html", "_review/plot-report.html")), force = TRUE)
@@ -960,6 +999,7 @@ if (!requireNamespace("mfclshiny", quietly = TRUE) ||
 
 message("Building BET plots with mfclshiny Shiny report registry.")
 message("Payloads: ", nrow(payload_index))
+if (nzchar(selection_file)) message("Report selection: ", selection_file)
 message("Output: ", normalizePath(out_dir, winslash = "/", mustWork = FALSE))
 
 result <- call_with_supported_args(
@@ -981,12 +1021,16 @@ result <- call_with_supported_args(
     species_code = species_code,
     species_label = species_label,
     assessment_year = assessment_year,
-    max_fisheries = max_fisheries
+    max_fisheries = max_fisheries,
+    selection_file = selection_file
   )
 )
 
-if (is.null(result) || !is.data.frame(result$figures) || !nrow(result$figures)) {
-  stop("mfclshiny Shiny registry export produced no report-ready figures.", call. = FALSE)
+if (is.null(result) || !is.data.frame(result$figures)) {
+  stop("mfclshiny Shiny registry export did not return a figure index.", call. = FALSE)
+}
+if (!nrow(result$figures)) {
+  warning("mfclshiny Shiny registry export produced no report-ready figures; writing empty report-ready indices and logs.")
 }
 
 result <- write_clean_indices_and_review(
