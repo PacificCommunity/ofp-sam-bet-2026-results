@@ -43,6 +43,15 @@ input_jobs:
     latest: 1
 output_patterns:
   - outputs/**
+local_apps:
+  - key: mfclshiny
+    label: MFCL Shiny
+    icon: chart-no-axes-combined
+    archive_sources:
+      - inputs
+    container_port: 3838
+    command: >-
+      Rscript -e 'lib <- Sys.getenv("KFLOW_LOCAL_APP_R_LIBS", "/kflow/work/R-library"); dir.create(lib, recursive = TRUE, showWarnings = FALSE); .libPaths(unique(c(lib, .libPaths()))); if (!requireNamespace("mfclshiny", quietly = TRUE)) { options(repos = c(CRAN = "https://cloud.r-project.org")); if (!requireNamespace("remotes", quietly = TRUE)) utils::install.packages("remotes", lib = lib, quiet = TRUE); remotes::install_github("PacificCommunity/mfclshiny", ref = "9bd29ff", lib = lib, upgrade = "never", quiet = TRUE) }; mfclshiny::run_mfclshiny(model_dir = Sys.getenv("KFLOW_LOCAL_APP_INPUT_DIR", "/kflow/inputs"), host = "0.0.0.0", port = as.integer(Sys.getenv("PORT", "3838")), launch.browser = FALSE)'
 triggers:
   on_success:
     - key: report-from-results
