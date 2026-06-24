@@ -94,7 +94,10 @@ local_apps:
         value <- tryCatch(desc[[name]], error = function(e) "")
         if (is.null(value) || !length(value) || is.na(value[[1L]])) "" else as.character(value[[1L]])
       }
-      installed_desc <- tryCatch(utils::packageDescription("mfclshiny", lib.loc = lib), error = function(e) NULL)
+      installed_desc <- tryCatch(
+        suppressWarnings(utils::packageDescription("mfclshiny", lib.loc = lib)),
+        error = function(e) NULL
+      )
       installed_sha <- desc_field(installed_desc, "RemoteSha")
       installed_ref <- desc_field(installed_desc, "RemoteRef")
       ref_is_sha <- grepl("^[0-9a-f]{7,40}$", mfclshiny_ref, ignore.case = TRUE)
