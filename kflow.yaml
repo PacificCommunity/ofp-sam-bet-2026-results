@@ -11,6 +11,8 @@ env:
   JOB_TITLE: BET results
   JOB_DESCRIPTION: Build report-ready figures and tables from upstream model payloads.
   JOB_KEY: results
+  REPORT_JOB_TITLE: BET report
+  REPORT_JOB_DESCRIPTION: Render the assessment report from generated BET results.
   FLOW_GROUP: bet-2026-base
   PLOT_TITLE: BET 2026 report-ready figures
   PLOT_MAX_FISHERIES: "18"
@@ -240,9 +242,9 @@ triggers:
         - "{{ job.job_number }}"
       env:
         FLOW_GROUP: "{{ job.config.FLOW_GROUP }}"
-        JOB_TITLE: BET report
+        JOB_TITLE: "{{ job.config.REPORT_JOB_TITLE }}"
         JOB_KEY: report
-        JOB_DESCRIPTION: Render the assessment report from generated BET results.
+        JOB_DESCRIPTION: "{{ job.config.REPORT_JOB_DESCRIPTION }}"
         RESULTS_JOB_ID: "{{ job.job_number }}"
         RESULTS_JOB_IDS: "{{ job.job_number }}"
         FLOW_SPECIES: "{{ job.config.FLOW_SPECIES }}"
@@ -263,6 +265,8 @@ job_config:
     - JOB_TITLE
     - JOB_DESCRIPTION
     - JOB_KEY
+    - REPORT_JOB_TITLE
+    - REPORT_JOB_DESCRIPTION
     - PLOT_TITLE
     - PLOT_MAX_FISHERIES
     - PLOT_REPORT_SELECTION
