@@ -267,9 +267,13 @@ excluded_report_figure <- function(rows) {
   )) || grepl("observed[- ]to[- ]expected recapture pressure|recapture pressure by release group", text, perl = TRUE)
 }
 
-report_figure_ids <- function(figure_index) {
+all_figure_ids <- function(figure_index) {
   figure_ids <- unique(as.character(figure_index$figure %||% ""))
-  figure_ids <- figure_ids[nzchar(figure_ids) & !is.na(figure_ids)]
+  figure_ids[nzchar(figure_ids) & !is.na(figure_ids)]
+}
+
+report_figure_ids <- function(figure_index) {
+  figure_ids <- all_figure_ids(figure_index)
   keep <- vapply(figure_ids, function(id) {
     rows <- figure_index[as.character(figure_index$figure) == id, , drop = FALSE]
     placement <- tolower(as.character(rows$placement %||% ""))
@@ -286,6 +290,13 @@ report_item_placement <- function(rows, fallback_appendix = FALSE) {
   if (length(placement) && any(placement == "main")) return("main")
   if (length(placement) && any(placement == "appendix")) return("appendix")
   if (isTRUE(fallback_appendix)) "appendix" else "main"
+}
+
+overview_placement <- function(rows) {
+  if (excluded_report_figure(rows)) return("Excluded")
+  placement <- report_item_placement(rows, fallback_appendix = appendix_figure(rows))
+  if (identical(placement, "exclude")) return("Excluded")
+  if (identical(placement, "appendix")) "Appendix" else "Main"
 }
 
 preferred_figure_row <- function(rows, output_dir) {
@@ -422,7 +433,7 @@ write_report_ready_tables_qmd <- function(table_index, ready_dir) {
 write_report_ready_map <- function(figure_index, table_index, output_dir, overview_dir) {
   figure_index <- ensure_index_columns(figure_index, "figure")
   table_index <- ensure_index_columns(table_index, "table")
-  figure_ids <- report_figure_ids(figure_index)
+  figure_ids <- all_figure_ids(figure_index)
   table_ids <- unique(as.character(table_index$table %||% ""))
   table_ids <- table_ids[nzchar(table_ids) & !is.na(table_ids)]
   figure_cards <- character()
@@ -434,9 +445,7 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, overvi
     preview <- paste0("../", rel)
     label <- index_value(row, "label", id)
     caption <- index_value(row, "caption", label)
-    placement <- report_item_placement(rows, fallback_appendix = appendix_figure(rows))
-    if (identical(placement, "exclude")) next
-    placement <- if (identical(placement, "appendix")) "Appendix" else "Main"
+    placement <- overview_placement(rows)
     marker <- paste0("<!-- figure: ", id, " -->")
     figure_cards <- c(
       figure_cards,
@@ -475,7 +484,7 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, overvi
     "body{margin:0;background:#eef6f7;color:#173248;font-family:system-ui,-apple-system,Segoe UI,sans-serif;}main{max-width:1320px;margin:0 auto;padding:32px;}h1{font-size:34px;margin:0 0 8px;}h2{font-size:20px;margin:34px 0 14px}.lead{color:#5b7181;margin:0 0 22px}.summary{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 28px}.pill{background:#fff;border:1px solid #cfe0e8;border-radius:999px;padding:8px 12px;font-weight:800}.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}.card{background:#fff;border:1px solid #cfdee6;border-radius:8px;box-shadow:0 8px 24px rgba(20,53,73,.07);overflow:hidden}.thumb{background:#f8fbfc;border-bottom:1px solid #e1ebf0;height:210px;display:flex;align-items:center;justify-content:center}.thumb img{max-width:100%;max-height:100%;display:block}.card h3{font-size:16px;margin:12px 14px 8px}.card p{color:#506676;font-size:13px;line-height:1.45;margin:0 14px 14px}.meta{align-items:center;display:flex;gap:8px;margin:12px 14px 0}.meta span{background:#e9f5ee;border:1px solid #b9dcc8;border-radius:999px;color:#1e7450;font-size:12px;font-weight:900;padding:3px 8px}.meta code,.links code{background:#f5f8fa;border:1px solid #dbe7ed;border-radius:6px;color:#5b6f7d;font-size:12px;padding:2px 5px}.links{align-items:center;border-top:1px solid #eef3f5;display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding:10px 14px}.links a{border:1px solid #c9dde8;border-radius:999px;color:#1b6187;font-size:12px;font-weight:900;padding:4px 8px;text-decoration:none}.table-card{padding-top:2px}.table-card .links{border-top:0;padding-top:0}</style>",
     "</head><body><main>",
     "<h1>BET results map</h1>",
-    "<p class=\"lead\">Read-only map of generated figures and tables. Edit the QMD files in the report repository to include, remove, reorder, or rewrite captions.</p>",
+    "<p class=\"lead\">Read-only map of all generated figures and tables, including items not currently placed in the report.</p>",
     "<div class=\"summary\">",
     paste0("<div class=\"pill\">", length(figure_ids), " figures</div>"),
     paste0("<div class=\"pill\">", length(table_ids), " tables</div>"),
@@ -498,11 +507,9 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, overvi
 
 write_report_ready_figure_gallery <- function(figure_index, output_dir, overview_dir) {
   figure_index <- ensure_index_columns(figure_index, "figure")
-  figure_ids <- report_figure_ids(figure_index)
+  figure_ids <- all_figure_ids(figure_index)
   records <- lapply(figure_ids, function(id) {
     rows <- figure_index[as.character(figure_index$figure) == id, , drop = FALSE]
-    placement <- report_item_placement(rows, fallback_appendix = appendix_figure(rows))
-    if (identical(placement, "exclude")) return(NULL)
     row <- preferred_figure_row(rows, output_dir)
     if (!nrow(row)) return(NULL)
     rel <- index_value(row, "relative_path", index_value(row, "file", ""))
@@ -510,7 +517,7 @@ write_report_ready_figure_gallery <- function(figure_index, output_dir, overview
       figure = id,
       label = index_value(row, "label", id),
       caption = index_value(row, "caption", index_value(row, "label", id)),
-      placement = if (identical(placement, "appendix")) "Appendix" else "Main",
+      placement = overview_placement(rows),
       image = paste0("../", rel),
       file = rel,
       anchor = paste0("figure-", report_slug(id, "figure")),
@@ -532,11 +539,12 @@ write_report_ready_figure_gallery <- function(figure_index, output_dir, overview
   }
 
   figure_block <- function(row) {
+    placement_class <- tolower(gsub("[^a-z0-9]+", "-", row$placement, perl = TRUE))
     paste0(
-      "<article class=\"figure-card\" id=\"", html_escape(row$anchor), "\">",
+      "<article class=\"figure-card ", html_escape(placement_class), "\" id=\"", html_escape(row$anchor), "\">",
       "<header><div><span class=\"placement\">", html_escape(row$placement), "</span>",
       "<code>", html_escape(row$figure), "</code></div>",
-      "<a href=\"", html_escape(row$image), "\">open image</a></header>",
+      "<a href=\"", html_escape(row$image), "\">open</a></header>",
       "<figure><img loading=\"lazy\" src=\"", html_escape(row$image), "\" alt=\"", html_escape(row$caption), "\"></figure>",
       "<h2>", html_escape(row$label), "</h2>",
       "<p>", html_escape(row$caption), "</p>",
@@ -544,70 +552,57 @@ write_report_ready_figure_gallery <- function(figure_index, output_dir, overview
       "</article>"
     )
   }
-  section_block <- function(title, rows) {
-    if (!nrow(rows)) return(character())
-    c(
-      paste0("<section><h1>", html_escape(title), "</h1>"),
-      vapply(seq_len(nrow(rows)), function(i) figure_block(rows[i, , drop = FALSE]), character(1)),
-      "</section>"
-    )
-  }
-
-  main_rows <- records[records$placement == "Main", , drop = FALSE]
-  appendix_rows <- records[records$placement == "Appendix", , drop = FALSE]
-  nav_links <- if (nrow(records)) {
-    vapply(seq_len(nrow(records)), function(i) {
-      row <- records[i, , drop = FALSE]
-      paste0("<a href=\"#", html_escape(row$anchor), "\">", html_escape(row$label), "</a>")
-    }, character(1))
-  } else {
-    "<span>No report-ready figures were produced.</span>"
-  }
+  main_count <- sum(records$placement == "Main")
+  appendix_count <- sum(records$placement == "Appendix")
+  excluded_count <- sum(records$placement == "Excluded")
   html <- c(
     "<!doctype html>",
     "<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
-    "<title>BET report-ready figures</title>",
+    "<title>BET results figure overview</title>",
     "<style>",
     paste0(
-      "body{margin:0;background:#f4f8f9;color:#132d3d;font-family:system-ui,-apple-system,Segoe UI,sans-serif;}",
-      "main{max-width:1520px;margin:0 auto;padding:26px 28px 44px;}",
-      ".top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px;}",
-      ".top h1{font-size:30px;line-height:1.1;margin:0 0 6px;}",
-      ".top p{color:#526a79;margin:0;}",
-      ".summary{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}",
-      ".pill{background:#fff;border:1px solid #d1e0e7;border-radius:999px;font-weight:850;padding:7px 11px;}",
-      ".nav{background:#fff;border:1px solid #d5e3ea;border-radius:8px;display:flex;gap:7px;flex-wrap:wrap;margin:0 0 22px;padding:10px;}",
-      ".nav a{background:#edf5f7;border:1px solid #d6e7ee;border-radius:999px;color:#1a5f82;font-size:12px;font-weight:850;padding:5px 8px;text-decoration:none;}",
-      "section>h1{font-size:22px;margin:30px 0 12px;}",
-      ".figure-card{background:#fff;border:1px solid #ccdce4;border-radius:8px;margin:0 0 20px;overflow:hidden;box-shadow:0 10px 28px rgba(21,56,77,.08);}",
-      ".figure-card header{align-items:center;background:#eef5f7;border-bottom:1px solid #d8e5eb;display:flex;gap:12px;justify-content:space-between;padding:9px 12px;}",
+      "body{margin:0;background:#f5f8f8;color:#132d3d;font-family:system-ui,-apple-system,Segoe UI,sans-serif;}",
+      "main{max-width:1720px;margin:0 auto;padding:18px 20px 34px;}",
+      ".top{align-items:center;display:flex;justify-content:space-between;gap:16px;margin-bottom:14px;}",
+      ".top h1{font-size:24px;line-height:1.1;margin:0 0 4px;}",
+      ".top p{color:#526a79;font-size:13px;margin:0;}",
+      ".summary{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;}",
+      ".pill{background:#fff;border:1px solid #d1e0e7;border-radius:999px;font-size:12px;font-weight:850;padding:5px 9px;}",
+      ".grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}",
+      ".figure-card{background:#fff;border:1px solid #ccdce4;border-radius:8px;display:flex;flex-direction:column;min-width:0;overflow:hidden;box-shadow:0 6px 18px rgba(21,56,77,.07);}",
+      ".figure-card header{align-items:center;background:#eef5f7;border-bottom:1px solid #d8e5eb;display:flex;gap:8px;justify-content:space-between;padding:7px 9px;}",
       ".figure-card header div{align-items:center;display:flex;gap:8px;min-width:0;}",
-      ".figure-card header a{border:1px solid #bdd6e3;border-radius:999px;color:#17617f;font-size:12px;font-weight:900;padding:4px 8px;text-decoration:none;white-space:nowrap;}",
-      ".placement{background:#e8f5ee;border:1px solid #b9dcc8;border-radius:999px;color:#1b744d;font-size:12px;font-weight:900;padding:3px 8px;}",
+      ".figure-card header a{border:1px solid #bdd6e3;border-radius:999px;color:#17617f;font-size:12px;font-weight:900;padding:3px 7px;text-decoration:none;white-space:nowrap;}",
+      ".placement{background:#e8f5ee;border:1px solid #b9dcc8;border-radius:999px;color:#1b744d;font-size:11px;font-weight:900;padding:2px 7px;}",
+      ".appendix .placement{background:#eef2fb;border-color:#cbd6f1;color:#2e5594}.excluded{opacity:.82}.excluded .placement{background:#f8eeee;border-color:#e1c4c4;color:#934141}",
       "code{background:#f7fafb;border:1px solid #dbe7ed;border-radius:6px;color:#526b7a;font-size:12px;padding:2px 5px;}",
-      ".figure-card figure{align-items:center;background:#fff;display:flex;justify-content:center;margin:0;padding:14px;}",
-      ".figure-card img{display:block;height:auto;max-height:none;max-width:100%;width:auto;}",
-      ".figure-card h2{font-size:17px;margin:13px 16px 7px;}",
-      ".figure-card p{color:#425d6e;font-size:14px;line-height:1.45;margin:0 16px 14px;}",
-      ".figure-card footer{border-top:1px solid #edf3f6;padding:9px 16px 12px;}",
-      "@media (max-width:760px){main{padding:18px 12px 30px}.top{display:block}.summary{justify-content:flex-start;margin-top:12px}.figure-card figure{padding:8px}}"
+      ".figure-card figure{align-items:center;background:#fff;display:flex;height:176px;justify-content:center;margin:0;padding:8px;}",
+      ".figure-card img{display:block;height:100%;max-height:100%;max-width:100%;object-fit:contain;width:100%;}",
+      ".figure-card h2{font-size:13px;line-height:1.25;margin:9px 10px 5px;}",
+      ".figure-card p{color:#425d6e;font-size:12px;line-height:1.35;margin:0 10px 9px;max-height:48px;overflow:hidden;}",
+      ".figure-card footer{border-top:1px solid #edf3f6;margin-top:auto;padding:7px 10px 9px;}",
+      ".figure-card footer code{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      "@media (min-width:1500px){.grid{grid-template-columns:repeat(auto-fill,minmax(245px,1fr));}.figure-card figure{height:160px;}}",
+      "@media (max-width:760px){main{padding:14px 10px 24px}.top{display:block}.summary{justify-content:flex-start;margin-top:10px}.grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));}.figure-card figure{height:148px}}"
     ),
     "</style>",
     "</head><body><main>",
     "<div class=\"top\"><div>",
-    "<h1>BET report-ready figures</h1>",
-    "<p>Generated from the report-ready figure selection in the results task.</p>",
+    "<h1>BET results figure overview</h1>",
+    "<p>All generated figures are shown here; badges indicate whether each item is currently main, appendix, or excluded from the report seed.</p>",
     "</div><div class=\"summary\">",
     paste0("<span class=\"pill\">", nrow(records), " figures</span>"),
-    paste0("<span class=\"pill\">", nrow(main_rows), " main</span>"),
-    paste0("<span class=\"pill\">", nrow(appendix_rows), " appendix</span>"),
+    paste0("<span class=\"pill\">", main_count, " main</span>"),
+    paste0("<span class=\"pill\">", appendix_count, " appendix</span>"),
+    paste0("<span class=\"pill\">", excluded_count, " excluded</span>"),
     "</div></div>",
-    "<nav class=\"nav\">",
-    nav_links,
-    "</nav>",
-    section_block("Main figures", main_rows),
-    section_block("Appendix figures", appendix_rows),
-    if (!nrow(records)) "<p>No report-ready figures were produced.</p>" else character(),
+    "<section class=\"grid\">",
+    if (nrow(records)) {
+      vapply(seq_len(nrow(records)), function(i) figure_block(records[i, , drop = FALSE]), character(1))
+    } else {
+      "<p>No figures were produced.</p>"
+    },
+    "</section>",
     "</main></body></html>"
   )
   dir.create(overview_dir, recursive = TRUE, showWarnings = FALSE)

@@ -45,12 +45,12 @@ outputs/logs/
 outputs/README.txt
 ```
 
-Open `outputs/overview/report-ready-figures.html` to review the selected
-report-ready figure set in one page. Open `outputs/overview/report-map.html` to
-browse generated figures, tables, and QMD markers. The selection file controls
-inclusion, main/appendix placement, captions, and the captured Shiny input
-state. The report repo still receives editable QMD section seeds for final
-manual wording.
+Open `outputs/overview/report-ready-figures.html` to review all generated
+figures in a compact one-page gallery. Open `outputs/overview/report-map.html`
+to browse generated figures, tables, and QMD markers. The selection file
+controls inclusion, main/appendix placement, captions, and the captured Shiny
+input state. The report repo still receives editable QMD section seeds for
+final manual wording.
 
 `analysis-manifest.json` is deliberately small: it records available analysis
 layers such as model runs, likelihood profiles, Hessian checks, jitter, and
@@ -92,3 +92,6 @@ run the same command.
 | `PLOT_JPEG_QUALITY` | `82` | JPEG sidecar quality for PDF rendering. |
 | `KFLOW_REPO_RUNTIME_PACKAGES` | `mfclshiny=PacificCommunity/mfclshiny@main` | Private runtime package checked and installed when the job starts. |
 | `MFCLSHINY_SELECTION_PUBLISH_CMD` | unset | Optional local-app hook for saving and publishing a selection to the next curated layer. |
+| `KFLOW_REPORT_COMMIT_GENERATED` | `false` | Leave generated report inputs in Kflow artifacts rather than committing them back to the report repo. |
+| `KFLOW_REPORT_PUSH_GENERATED` | `false` | Do not push generated-input commits from the report task. |
+| `KFLOW_REPORT_PUBLISH_REQUIRED` | `false` | Do not fail an otherwise successful report render because generated-input publishing is unavailable. |
