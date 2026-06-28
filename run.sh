@@ -5,22 +5,30 @@ OUT_DIR="${OUTPUT_DIR:-outputs}"
 INPUT_DIR="${INPUT_DIR:-inputs}"
 ROOT="$(pwd)"
 
+runtime_package_specs() {
+  printf "%s" "${KFLOW_REPO_RUNTIME_PACKAGES:-${KFLOW_RUNTIME_PACKAGES:-}}"
+}
+
+runtime_update_mode() {
+  printf "%s" "${KFLOW_REPO_RUNTIME_UPDATE:-${TUNA_FLOW_RUNTIME_UPDATE:-${KFLOW_RUNTIME_UPDATE:-auto}}}"
+}
+
 runtime_packages_disabled() {
-  case "${KFLOW_RUNTIME_PACKAGES:-}" in
+  case "$(runtime_package_specs)" in
     ""|0|false|FALSE|no|NO|off|OFF|none|NONE|skip|SKIP) return 0 ;;
     *) return 1 ;;
   esac
 }
 
 runtime_updates_disabled() {
-  case "${KFLOW_RUNTIME_UPDATE:-auto}" in
+  case "$(runtime_update_mode)" in
     ""|0|false|FALSE|no|NO|off|OFF|none|NONE|skip|SKIP|never|NEVER) return 0 ;;
     *) return 1 ;;
   esac
 }
 
 runtime_updates_direct() {
-  case "${KFLOW_RUNTIME_UPDATE:-auto}" in
+  case "$(runtime_update_mode)" in
     direct|DIRECT|url|URL|download|DOWNLOAD) return 0 ;;
     *) return 1 ;;
   esac
@@ -60,7 +68,7 @@ install_missing_runtime_packages() {
   ensure_runtime_library
   Rscript - <<'RS'
 truthy <- function(value) tolower(value) %in% c("1", "true", "yes", "y", "on", "always")
-spec_text <- Sys.getenv("KFLOW_RUNTIME_PACKAGES", "")
+spec_text <- Sys.getenv("KFLOW_REPO_RUNTIME_PACKAGES", Sys.getenv("KFLOW_RUNTIME_PACKAGES", ""))
 parts <- trimws(strsplit(spec_text, ",", fixed = TRUE)[[1]])
 parts <- parts[nzchar(parts) & grepl("=", parts, fixed = TRUE)]
 if (!length(parts)) quit(save = "no", status = 0)
@@ -169,9 +177,6 @@ RS
 }
 
 prepare_runtime_packages() {
-  if [[ -n "${TUNA_FLOW_RUNTIME_UPDATE:-}" ]]; then
-    export KFLOW_RUNTIME_UPDATE="${TUNA_FLOW_RUNTIME_UPDATE}"
-  fi
   runtime_packages_disabled && return 0
   ensure_runtime_library
   if runtime_updates_direct; then
