@@ -211,6 +211,24 @@ clone_github_source <- function(repo, ref) {
   }
   source_dir
 }
+install_local_source <- function(path, lib) {
+  r_bin <- file.path(R.home("bin"), "R")
+  output <- tryCatch(
+    system2(
+      r_bin,
+      c("CMD", "INSTALL", "--library", lib, path),
+      stdout = TRUE,
+      stderr = TRUE
+    ),
+    error = function(e) structure(conditionMessage(e), status = 1L)
+  )
+  status <- attr(output, "status")
+  if (is.null(status)) status <- 0L
+  if (!identical(as.integer(status), 0L)) {
+    detail <- paste(tail(as.character(output), 30), collapse = "\n")
+    stop("R CMD INSTALL failed for ", basename(path), "\n", detail, call. = FALSE)
+  }
+}
 for (spec in missing) {
   message("[kflow-runtime-update] Installing missing runtime package ", spec$package, " from ", spec$repo, "@", spec$ref, ".")
   err <- tryCatch({
@@ -223,13 +241,7 @@ for (spec in missing) {
       }
     )
     on.exit(unlink(archive, recursive = TRUE, force = TRUE), add = TRUE)
-    remotes::install_local(
-      archive,
-      lib = lib,
-      upgrade = "never",
-      force = TRUE,
-      quiet = TRUE
-    )
+    install_local_source(archive, lib)
     NULL
   }, error = function(e) e)
   if (inherits(err, "error")) {
