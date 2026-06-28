@@ -38,16 +38,20 @@ outputs/report-selection.json
 outputs/analysis-manifest.json
 outputs/report-ready/figures.qmd
 outputs/report-ready/tables.qmd
+outputs/report-ready/report-ready-figures.html
 outputs/report-ready/report-map.html
 outputs/plot-report.qmd
 outputs/_review/plot-report.qmd
+outputs/_review/report-ready-figures.html
 outputs/_review/report-map.html
 ```
 
-Open `outputs/report-ready/report-map.html` to browse the generated assets. The
-selection file controls inclusion, main/appendix placement, captions, and the
-captured Shiny input state. The report repo still receives editable QMD section
-seeds for final manual wording.
+Open `outputs/report-ready/report-ready-figures.html` to review the selected
+report-ready figure set in one page. Open `outputs/report-ready/report-map.html`
+to browse generated figures, tables, and QMD markers. The selection file
+controls inclusion, main/appendix placement, captions, and the captured Shiny
+input state. The report repo still receives editable QMD section seeds for final
+manual wording.
 
 `analysis-manifest.json` is deliberately small: it records available analysis
 layers such as model runs, likelihood profiles, Hessian checks, jitter, and

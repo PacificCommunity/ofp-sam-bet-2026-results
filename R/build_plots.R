@@ -494,6 +494,124 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, ready_
   invisible(file.path(ready_dir, "report-map.html"))
 }
 
+write_report_ready_figure_gallery <- function(figure_index, output_dir, ready_dir) {
+  figure_index <- ensure_index_columns(figure_index, "figure")
+  figure_ids <- report_figure_ids(figure_index)
+  records <- lapply(figure_ids, function(id) {
+    rows <- figure_index[as.character(figure_index$figure) == id, , drop = FALSE]
+    placement <- report_item_placement(rows, fallback_appendix = appendix_figure(rows))
+    if (identical(placement, "exclude")) return(NULL)
+    row <- preferred_figure_row(rows, output_dir)
+    if (!nrow(row)) return(NULL)
+    rel <- index_value(row, "relative_path", index_value(row, "file", ""))
+    data.frame(
+      figure = id,
+      label = index_value(row, "label", id),
+      caption = index_value(row, "caption", index_value(row, "label", id)),
+      placement = if (identical(placement, "appendix")) "Appendix" else "Main",
+      image = paste0("../", rel),
+      file = rel,
+      anchor = paste0("figure-", report_slug(id, "figure")),
+      stringsAsFactors = FALSE
+    )
+  })
+  records <- bind_rows_fill(records)
+  if (!nrow(records)) {
+    records <- data.frame(
+      figure = character(),
+      label = character(),
+      caption = character(),
+      placement = character(),
+      image = character(),
+      file = character(),
+      anchor = character(),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  figure_block <- function(row) {
+    paste0(
+      "<article class=\"figure-card\" id=\"", html_escape(row$anchor), "\">",
+      "<header><div><span class=\"placement\">", html_escape(row$placement), "</span>",
+      "<code>", html_escape(row$figure), "</code></div>",
+      "<a href=\"", html_escape(row$image), "\">open image</a></header>",
+      "<figure><img loading=\"lazy\" src=\"", html_escape(row$image), "\" alt=\"", html_escape(row$caption), "\"></figure>",
+      "<h2>", html_escape(row$label), "</h2>",
+      "<p>", html_escape(row$caption), "</p>",
+      "<footer><code>", html_escape(row$file), "</code></footer>",
+      "</article>"
+    )
+  }
+  section_block <- function(title, rows) {
+    if (!nrow(rows)) return(character())
+    c(
+      paste0("<section><h1>", html_escape(title), "</h1>"),
+      vapply(seq_len(nrow(rows)), function(i) figure_block(rows[i, , drop = FALSE]), character(1)),
+      "</section>"
+    )
+  }
+
+  main_rows <- records[records$placement == "Main", , drop = FALSE]
+  appendix_rows <- records[records$placement == "Appendix", , drop = FALSE]
+  nav_links <- if (nrow(records)) {
+    vapply(seq_len(nrow(records)), function(i) {
+      row <- records[i, , drop = FALSE]
+      paste0("<a href=\"#", html_escape(row$anchor), "\">", html_escape(row$label), "</a>")
+    }, character(1))
+  } else {
+    "<span>No report-ready figures were produced.</span>"
+  }
+  html <- c(
+    "<!doctype html>",
+    "<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    "<title>BET report-ready figures</title>",
+    "<style>",
+    paste0(
+      "body{margin:0;background:#f4f8f9;color:#132d3d;font-family:system-ui,-apple-system,Segoe UI,sans-serif;}",
+      "main{max-width:1520px;margin:0 auto;padding:26px 28px 44px;}",
+      ".top{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px;}",
+      ".top h1{font-size:30px;line-height:1.1;margin:0 0 6px;}",
+      ".top p{color:#526a79;margin:0;}",
+      ".summary{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}",
+      ".pill{background:#fff;border:1px solid #d1e0e7;border-radius:999px;font-weight:850;padding:7px 11px;}",
+      ".nav{background:#fff;border:1px solid #d5e3ea;border-radius:8px;display:flex;gap:7px;flex-wrap:wrap;margin:0 0 22px;padding:10px;}",
+      ".nav a{background:#edf5f7;border:1px solid #d6e7ee;border-radius:999px;color:#1a5f82;font-size:12px;font-weight:850;padding:5px 8px;text-decoration:none;}",
+      "section>h1{font-size:22px;margin:30px 0 12px;}",
+      ".figure-card{background:#fff;border:1px solid #ccdce4;border-radius:8px;margin:0 0 20px;overflow:hidden;box-shadow:0 10px 28px rgba(21,56,77,.08);}",
+      ".figure-card header{align-items:center;background:#eef5f7;border-bottom:1px solid #d8e5eb;display:flex;gap:12px;justify-content:space-between;padding:9px 12px;}",
+      ".figure-card header div{align-items:center;display:flex;gap:8px;min-width:0;}",
+      ".figure-card header a{border:1px solid #bdd6e3;border-radius:999px;color:#17617f;font-size:12px;font-weight:900;padding:4px 8px;text-decoration:none;white-space:nowrap;}",
+      ".placement{background:#e8f5ee;border:1px solid #b9dcc8;border-radius:999px;color:#1b744d;font-size:12px;font-weight:900;padding:3px 8px;}",
+      "code{background:#f7fafb;border:1px solid #dbe7ed;border-radius:6px;color:#526b7a;font-size:12px;padding:2px 5px;}",
+      ".figure-card figure{align-items:center;background:#fff;display:flex;justify-content:center;margin:0;padding:14px;}",
+      ".figure-card img{display:block;height:auto;max-height:none;max-width:100%;width:auto;}",
+      ".figure-card h2{font-size:17px;margin:13px 16px 7px;}",
+      ".figure-card p{color:#425d6e;font-size:14px;line-height:1.45;margin:0 16px 14px;}",
+      ".figure-card footer{border-top:1px solid #edf3f6;padding:9px 16px 12px;}",
+      "@media (max-width:760px){main{padding:18px 12px 30px}.top{display:block}.summary{justify-content:flex-start;margin-top:12px}.figure-card figure{padding:8px}}"
+    ),
+    "</style>",
+    "</head><body><main>",
+    "<div class=\"top\"><div>",
+    "<h1>BET report-ready figures</h1>",
+    "<p>Generated from the report-ready figure selection in the results task.</p>",
+    "</div><div class=\"summary\">",
+    paste0("<span class=\"pill\">", nrow(records), " figures</span>"),
+    paste0("<span class=\"pill\">", nrow(main_rows), " main</span>"),
+    paste0("<span class=\"pill\">", nrow(appendix_rows), " appendix</span>"),
+    "</div></div>",
+    "<nav class=\"nav\">",
+    nav_links,
+    "</nav>",
+    section_block("Main figures", main_rows),
+    section_block("Appendix figures", appendix_rows),
+    if (!nrow(records)) "<p>No report-ready figures were produced.</p>" else character(),
+    "</main></body></html>"
+  )
+  writeLines(html, file.path(ready_dir, "report-ready-figures.html"))
+  invisible(file.path(ready_dir, "report-ready-figures.html"))
+}
+
 write_report_ready_outputs <- function(result, output_dir) {
   ready_dir <- file.path(output_dir, "report-ready")
   dir.create(ready_dir, recursive = TRUE, showWarnings = FALSE)
@@ -501,11 +619,12 @@ write_report_ready_outputs <- function(result, output_dir) {
   tables <- polish_output_metadata(result$tables %||% data.frame())
   figure_qmd <- write_report_ready_figures_qmd(figures, output_dir, ready_dir)
   table_qmd <- write_report_ready_tables_qmd(tables, ready_dir)
+  gallery_html <- write_report_ready_figure_gallery(figures, output_dir, ready_dir)
   map_html <- write_report_ready_map(figures, tables, output_dir, ready_dir)
   index <- data.frame(
-    file = c("figures.qmd", "tables.qmd", "report-map.html"),
-    path = c(figure_qmd, table_qmd, map_html),
-    purpose = c("report figure section seed", "report table section seed", "read-only output map"),
+    file = c("figures.qmd", "tables.qmd", "report-ready-figures.html", "report-map.html"),
+    path = c(figure_qmd, table_qmd, gallery_html, map_html),
+    purpose = c("report figure section seed", "report table section seed", "report-ready figure gallery", "read-only output map"),
     stringsAsFactors = FALSE
   )
   utils::write.csv(index, file.path(ready_dir, "report-ready-files.csv"), row.names = FALSE)
@@ -561,7 +680,7 @@ organize_review_outputs <- function(output_dir,
   }
   ready_dir <- file.path(output_dir, "report-ready")
   if (dir.exists(ready_dir)) {
-    for (file in c("report-map.html", "figures.qmd", "tables.qmd", "report-ready-files.csv")) {
+    for (file in c("report-ready-figures.html", "report-map.html", "figures.qmd", "tables.qmd", "report-ready-files.csv")) {
       source <- file.path(ready_dir, file)
       if (!file.exists(source)) next
       target <- file.path(review_dir, file)
@@ -574,7 +693,8 @@ organize_review_outputs <- function(output_dir,
     c(
       "BET plot review outputs",
       "",
-      "Open report-map.html first to review report-ready figures and QMD markers.",
+      "Open report-ready-figures.html first to review the report-ready figure set in one page.",
+      "Open report-map.html to review report-ready figures, tables, and QMD markers.",
       "plot-report.qmd is kept as a detailed review source. plot-report.html is only present when PLOT_RENDER_REVIEW_HTML=true.",
       "The full figure bundle remains under ../figures and table outputs under ../tables.",
       "",
