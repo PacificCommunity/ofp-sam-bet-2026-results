@@ -23,9 +23,9 @@ env:
   REPORT_QMD: assessment-report.qmd
   REPORT_FILE_STEM: bet-2026-report
   KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "true"
-  KFLOW_RUNTIME_UPDATE: skip
+  KFLOW_RUNTIME_UPDATE: never
   TUNA_FLOW_RUNTIME_UPDATE: direct
-  KFLOW_RUNTIME_PACKAGES: skip
+  KFLOW_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@fec9ab16b1f7627428d88f65d9cd5c0b55d104b1
   KFLOW_REPO_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@fec9ab16b1f7627428d88f65d9cd5c0b55d104b1
   MFCLSHINY_GITHUB_REF: "fec9ab16b1f7627428d88f65d9cd5c0b55d104b1"
   KFLOW_RUNTIME_GITHUB_AUTH: "true"
@@ -126,7 +126,7 @@ local_apps:
           utils::install.packages("remotes", lib = lib, quiet = TRUE)
         }
         token <- ""
-        for (name in c("GITHUB_PAT", "GIT_PAT", "GH_TOKEN", "KFLOW_GITHUB_TOKEN", "KFLOW_PERSONAL_TOKEN")) {
+        for (name in c("GITHUB_PAT", "GIT_PAT", "GITHUB_TOKEN", "GH_TOKEN", "KFLOW_GITHUB_TOKEN", "KFLOW_PERSONAL_TOKEN")) {
           value <- Sys.getenv(name, "")
           if (nzchar(value)) {
             token <- value
