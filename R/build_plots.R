@@ -539,7 +539,8 @@ write_report_ready_figure_gallery <- function(figure_index, output_dir, overview
   }
 
   figure_block <- function(row) {
-    placement_class <- tolower(gsub("[^a-z0-9]+", "-", row$placement, perl = TRUE))
+    placement_class <- gsub("[^a-z0-9]+", "-", tolower(row$placement), perl = TRUE)
+    placement_class <- gsub("(^-+|-+$)", "", placement_class, perl = TRUE)
     paste0(
       "<article class=\"figure-card ", html_escape(placement_class), "\" id=\"", html_escape(row$anchor), "\">",
       "<header><div><span class=\"placement\">", html_escape(row$placement), "</span>",
