@@ -142,7 +142,7 @@ download_github_archive <- function(repo, ref) {
   }
   curl <- Sys.which("curl")
   if (nzchar(curl)) {
-    args <- c("-fsSL", "--retry", "3", "--retry-delay", "2", "-w", "%{http_code}", "-o", archive)
+    args <- c("-sSL", "--retry", "3", "--retry-delay", "2", "-w", "%{http_code}", "-o", archive)
     if (nzchar(token)) {
       args <- c(
         "-H", paste("Authorization: Bearer", token),
@@ -155,7 +155,7 @@ download_github_archive <- function(repo, ref) {
     status <- attr(output, "status")
     if (is.null(status)) status <- 0L
     code <- tail(grep("^[0-9]{3}$", as.character(output), value = TRUE), 1)
-    if (!identical(as.integer(status), 0L)) {
+    if (!identical(as.integer(status), 0L) || !length(code) || !grepl("^2", code)) {
       stop("download failed from ", url, " (curl exit ", status, ", http ", ifelse(length(code), code, "unknown"), ")")
     }
   } else {
