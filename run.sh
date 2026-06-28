@@ -119,25 +119,39 @@ if (!requireNamespace("remotes", quietly = TRUE)) {
   utils::install.packages("remotes", lib = lib, dependencies = TRUE, repos = getOption("repos"))
 }
 token <- ""
+token_name <- ""
 for (name in c("GITHUB_PAT", "GIT_PAT", "GITHUB_TOKEN", "GH_TOKEN", "KFLOW_GITHUB_TOKEN", "KFLOW_PERSONAL_TOKEN")) {
   value <- Sys.getenv(name, "")
   if (nzchar(value)) {
     token <- value
+    token_name <- name
     break
   }
+}
+if (nzchar(token_name)) {
+  message("[kflow-runtime-update] Runtime archive download has GitHub token from ", token_name, ".")
+} else {
+  message("[kflow-runtime-update] Runtime archive download has no GitHub token.")
 }
 download_github_archive <- function(repo, ref) {
   archive <- tempfile(pattern = "kflow-runtime-", fileext = ".tar.gz")
   url <- sprintf("https://codeload.github.com/%s/tar.gz/%s", repo, ref)
   curl <- Sys.which("curl")
   if (nzchar(curl)) {
-    args <- c("-fsSL", "--retry", "3", "--retry-delay", "2", "-o", archive)
+    args <- c("-fsSL", "--retry", "3", "--retry-delay", "2", "-w", "%{http_code}", "-o", archive)
     if (nzchar(token)) {
       args <- c("-H", paste("Authorization: Bearer", token), args)
     }
-    status <- system2(curl, c(args, url), stdout = FALSE, stderr = FALSE)
-    if (!identical(status, 0L)) {
-      stop("download failed from ", url)
+    output <- tryCatch(
+      system2(curl, c(args, url), stdout = TRUE, stderr = TRUE),
+      warning = function(w) structure(conditionMessage(w), status = 1L),
+      error = function(e) structure(conditionMessage(e), status = 1L)
+    )
+    status <- attr(output, "status")
+    if (is.null(status)) status <- 0L
+    code <- tail(grep("^[0-9]{3}$", as.character(output), value = TRUE), 1)
+    if (!identical(as.integer(status), 0L)) {
+      stop("download failed from ", url, " (curl exit ", status, ", http ", ifelse(length(code), code, "unknown"), ")")
     }
   } else {
     headers <- if (nzchar(token)) c(Authorization = paste("Bearer", token)) else NULL
