@@ -175,12 +175,29 @@ clone_github_source <- function(repo, ref) {
   source_dir <- tempfile(pattern = "kflow-runtime-src-")
   unlink(source_dir, recursive = TRUE, force = TRUE)
   git_url <- sprintf("https://github.com/%s.git", repo)
-  auth_args <- character()
+  askpass <- ""
   if (nzchar(token)) {
-    auth_args <- c("-c", paste0("http.https://github.com/.extraheader=Authorization: Bearer ", token))
+    askpass <- tempfile(pattern = "kflow-git-askpass-")
+    writeLines(c(
+      "#!/bin/sh",
+      "case \"$1\" in",
+      "  *Username*) printf '%s\\n' x-access-token ;;",
+      "  *) printf '%s\\n' \"$KFLOW_GIT_ASKPASS_TOKEN\" ;;",
+      "esac"
+    ), askpass)
+    Sys.chmod(askpass, mode = "0700")
+    on.exit(unlink(askpass), add = TRUE)
   }
   run_git <- function(args) {
-    status <- system2(git, c(auth_args, args), stdout = FALSE, stderr = FALSE)
+    env <- character()
+    if (nzchar(askpass)) {
+      env <- c(
+        paste0("GIT_ASKPASS=", askpass),
+        "GIT_TERMINAL_PROMPT=0",
+        paste0("KFLOW_GIT_ASKPASS_TOKEN=", token)
+      )
+    }
+    status <- system2(git, args, env = env, stdout = FALSE, stderr = FALSE)
     identical(as.integer(status), 0L)
   }
   if (!run_git(c("clone", "--quiet", "--depth", "50", git_url, source_dir))) {
