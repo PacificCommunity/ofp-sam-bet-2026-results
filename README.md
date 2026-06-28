@@ -32,25 +32,24 @@ payloads from the submitter over SSH instead of starting Shiny on the submitter.
 ```text
 outputs/figures/
 outputs/tables/
-outputs/figure-index.csv
-outputs/table-index.csv
-outputs/report-selection.json
-outputs/analysis-manifest.json
+outputs/indices/figure-index.csv
+outputs/indices/table-index.csv
+outputs/indices/payload-index.csv
+outputs/indices/plot-summary.csv
+outputs/overview/report-ready-figures.html
+outputs/overview/report-map.html
 outputs/report-ready/figures.qmd
 outputs/report-ready/tables.qmd
-outputs/report-ready/report-ready-figures.html
-outputs/report-ready/report-map.html
-outputs/plot-report.qmd
-outputs/_review/plot-report.qmd
-outputs/_review/report-ready-figures.html
-outputs/_review/report-map.html
+outputs/review/plot-report.qmd
+outputs/logs/
+outputs/README.txt
 ```
 
-Open `outputs/report-ready/report-ready-figures.html` to review the selected
-report-ready figure set in one page. Open `outputs/report-ready/report-map.html`
-to browse generated figures, tables, and QMD markers. The selection file
-controls inclusion, main/appendix placement, captions, and the captured Shiny
-input state. The report repo still receives editable QMD section seeds for final
+Open `outputs/overview/report-ready-figures.html` to review the selected
+report-ready figure set in one page. Open `outputs/overview/report-map.html` to
+browse generated figures, tables, and QMD markers. The selection file controls
+inclusion, main/appendix placement, captions, and the captured Shiny input
+state. The report repo still receives editable QMD section seeds for final
 manual wording.
 
 `analysis-manifest.json` is deliberately small: it records available analysis

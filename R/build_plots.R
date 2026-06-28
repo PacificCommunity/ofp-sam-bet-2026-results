@@ -116,10 +116,9 @@ find_report_selection <- function(input_dir) {
 }
 
 write_payload_index <- function(payload_index, output_dir) {
-  table_dir <- file.path(output_dir, "tables")
-  dir.create(table_dir, recursive = TRUE, showWarnings = FALSE)
-  utils::write.csv(payload_index, file.path(table_dir, "payload-index.csv"), row.names = FALSE)
-  utils::write.csv(payload_index, file.path(output_dir, "payload-index.csv"), row.names = FALSE)
+  index_dir <- file.path(output_dir, "indices")
+  dir.create(index_dir, recursive = TRUE, showWarnings = FALSE)
+  utils::write.csv(payload_index, file.path(index_dir, "payload-index.csv"), row.names = FALSE)
   invisible(payload_index)
 }
 
@@ -133,11 +132,13 @@ write_plot_summary <- function(result, payload_index, output_dir) {
     tables = if (nrow(table_index)) length(unique(table_index$table)) else 0L,
     table_files = nrow(table_index),
     build_errors = if (is.data.frame(result$log)) sum(result$log$status == "error", na.rm = TRUE) else NA_integer_,
-    html = file.exists(file.path(output_dir, "plot-report.html")),
+    html = file.exists(file.path(output_dir, "review", "plot-report.html")),
     source = "mfclshiny_shiny_registry",
     stringsAsFactors = FALSE
   )
-  utils::write.csv(summary, file.path(output_dir, "plot-summary.csv"), row.names = FALSE)
+  index_dir <- file.path(output_dir, "indices")
+  dir.create(index_dir, recursive = TRUE, showWarnings = FALSE)
+  utils::write.csv(summary, file.path(index_dir, "plot-summary.csv"), row.names = FALSE)
   invisible(summary)
 }
 
@@ -418,7 +419,7 @@ write_report_ready_tables_qmd <- function(table_index, ready_dir) {
   invisible(file.path(ready_dir, "tables.qmd"))
 }
 
-write_report_ready_map <- function(figure_index, table_index, output_dir, ready_dir) {
+write_report_ready_map <- function(figure_index, table_index, output_dir, overview_dir) {
   figure_index <- ensure_index_columns(figure_index, "figure")
   table_index <- ensure_index_columns(table_index, "table")
   figure_ids <- report_figure_ids(figure_index)
@@ -444,7 +445,7 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, ready_
         "<div class=\"meta\"><span>", html_escape(placement), "</span><code>", html_escape(id), "</code></div>",
         "<h3>", html_escape(label), "</h3>",
         "<p>", html_escape(caption), "</p>",
-        "<div class=\"links\"><a href=\"figures.qmd\">figures.qmd</a><code>", html_escape(marker), "</code></div></article>"
+        "<div class=\"links\"><a href=\"../report-ready/figures.qmd\">figures.qmd</a><code>", html_escape(marker), "</code></div></article>"
       )
     )
   }
@@ -462,7 +463,7 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, ready_
         "<article class=\"card table-card\"><div class=\"meta\"><span>Table</span><code>", html_escape(id), "</code></div>",
         "<h3>", html_escape(label), "</h3>",
         "<p>", html_escape(caption), "</p>",
-        "<div class=\"links\"><a href=\"../", html_escape(rel), "\">CSV</a><a href=\"tables.qmd\">tables.qmd</a><code>", html_escape(marker), "</code></div></article>"
+        "<div class=\"links\"><a href=\"../", html_escape(rel), "\">CSV</a><a href=\"../report-ready/tables.qmd\">tables.qmd</a><code>", html_escape(marker), "</code></div></article>"
       )
     )
   }
@@ -490,11 +491,12 @@ write_report_ready_map <- function(figure_index, table_index, output_dir, ready_
     "</section>",
     "</main></body></html>"
   )
-  writeLines(html, file.path(ready_dir, "report-map.html"))
-  invisible(file.path(ready_dir, "report-map.html"))
+  dir.create(overview_dir, recursive = TRUE, showWarnings = FALSE)
+  writeLines(html, file.path(overview_dir, "report-map.html"))
+  invisible(file.path(overview_dir, "report-map.html"))
 }
 
-write_report_ready_figure_gallery <- function(figure_index, output_dir, ready_dir) {
+write_report_ready_figure_gallery <- function(figure_index, output_dir, overview_dir) {
   figure_index <- ensure_index_columns(figure_index, "figure")
   figure_ids <- report_figure_ids(figure_index)
   records <- lapply(figure_ids, function(id) {
@@ -608,21 +610,24 @@ write_report_ready_figure_gallery <- function(figure_index, output_dir, ready_di
     if (!nrow(records)) "<p>No report-ready figures were produced.</p>" else character(),
     "</main></body></html>"
   )
-  writeLines(html, file.path(ready_dir, "report-ready-figures.html"))
-  invisible(file.path(ready_dir, "report-ready-figures.html"))
+  dir.create(overview_dir, recursive = TRUE, showWarnings = FALSE)
+  writeLines(html, file.path(overview_dir, "report-ready-figures.html"))
+  invisible(file.path(overview_dir, "report-ready-figures.html"))
 }
 
 write_report_ready_outputs <- function(result, output_dir) {
   ready_dir <- file.path(output_dir, "report-ready")
+  overview_dir <- file.path(output_dir, "overview")
   dir.create(ready_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(overview_dir, recursive = TRUE, showWarnings = FALSE)
   figures <- polish_output_metadata(result$figures %||% data.frame())
   tables <- polish_output_metadata(result$tables %||% data.frame())
   figure_qmd <- write_report_ready_figures_qmd(figures, output_dir, ready_dir)
   table_qmd <- write_report_ready_tables_qmd(tables, ready_dir)
-  gallery_html <- write_report_ready_figure_gallery(figures, output_dir, ready_dir)
-  map_html <- write_report_ready_map(figures, tables, output_dir, ready_dir)
+  gallery_html <- write_report_ready_figure_gallery(figures, output_dir, overview_dir)
+  map_html <- write_report_ready_map(figures, tables, output_dir, overview_dir)
   index <- data.frame(
-    file = c("figures.qmd", "tables.qmd", "report-ready-figures.html", "report-map.html"),
+    file = c("figures.qmd", "tables.qmd", "../overview/report-ready-figures.html", "../overview/report-map.html"),
     path = c(figure_qmd, table_qmd, gallery_html, map_html),
     purpose = c("report figure section seed", "report table section seed", "report-ready figure gallery", "read-only output map"),
     stringsAsFactors = FALSE
@@ -640,13 +645,15 @@ write_clean_indices_and_review <- function(result,
                                            render_html = FALSE) {
   result$figures <- polish_output_metadata(result$figures %||% data.frame())
   result$tables <- polish_output_metadata(result$tables %||% data.frame())
+  index_dir <- file.path(output_dir, "indices")
+  review_dir <- file.path(output_dir, "review")
+  dir.create(index_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(review_dir, recursive = TRUE, showWarnings = FALSE)
   if (nrow(result$figures)) {
-    utils::write.csv(result$figures, file.path(output_dir, "mfclshiny-figure-index.csv"), row.names = FALSE)
-    utils::write.csv(result$figures, file.path(output_dir, "figure-index.csv"), row.names = FALSE)
+    utils::write.csv(result$figures, file.path(index_dir, "figure-index.csv"), row.names = FALSE)
   }
   if (nrow(result$tables)) {
-    utils::write.csv(result$tables, file.path(output_dir, "mfclshiny-table-index.csv"), row.names = FALSE)
-    utils::write.csv(result$tables, file.path(output_dir, "table-index.csv"), row.names = FALSE)
+    utils::write.csv(result$tables, file.path(index_dir, "table-index.csv"), row.names = FALSE)
   }
   mfclshiny::write_report_figure_review(
     figure_index = result$figures,
@@ -656,8 +663,8 @@ write_clean_indices_and_review <- function(result,
     species_code = species_code,
     species_label = species_label,
     assessment_year = assessment_year,
-    qmd_file = "plot-report.qmd",
-    html_file = "plot-report.html",
+    qmd_file = file.path("review", "plot-report.qmd"),
+    html_file = file.path("review", "plot-report.html"),
     render_html = isTRUE(render_html),
     figure_log = result$log %||% NULL,
     table_log = result$table_log %||% NULL
@@ -665,48 +672,69 @@ write_clean_indices_and_review <- function(result,
   result
 }
 
-organize_review_outputs <- function(output_dir,
-                                    html_file = "plot-report.html",
-                                    qmd_file = "plot-report.qmd") {
-  review_dir <- file.path(output_dir, "_review")
+move_if_exists <- function(from, to) {
+  if (!file.exists(from)) return(FALSE)
+  dir.create(dirname(to), recursive = TRUE, showWarnings = FALSE)
+  file.copy(from, to, overwrite = TRUE)
+  unlink(from, recursive = TRUE, force = TRUE)
+  TRUE
+}
+
+organize_result_outputs <- function(output_dir) {
+  index_dir <- file.path(output_dir, "indices")
+  log_dir <- file.path(output_dir, "logs")
+  review_dir <- file.path(output_dir, "review")
+  dir.create(index_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
   dir.create(review_dir, recursive = TRUE, showWarnings = FALSE)
-  copied <- character()
-  for (file in c(html_file, qmd_file, "mfclshiny-report-files.csv", "plot-summary.csv", "figure-optimization.csv")) {
-    source <- file.path(output_dir, file)
-    if (!file.exists(source)) next
-    target <- file.path(review_dir, basename(file))
-    file.copy(source, target, overwrite = TRUE)
-    copied <- c(copied, target)
+
+  index_files <- c(
+    "payload-index.csv",
+    "figure-index.csv",
+    "table-index.csv",
+    "mfclshiny-figure-index.csv",
+    "mfclshiny-table-index.csv",
+    "mfclshiny-report-files.csv",
+    "plot-summary.csv",
+    "figure-optimization.csv"
+  )
+  for (file in index_files) {
+    target_name <- sub("^mfclshiny-", "", file)
+    move_if_exists(file.path(output_dir, file), file.path(index_dir, target_name))
   }
-  ready_dir <- file.path(output_dir, "report-ready")
-  if (dir.exists(ready_dir)) {
-    for (file in c("report-ready-figures.html", "report-map.html", "figures.qmd", "tables.qmd", "report-ready-files.csv")) {
-      source <- file.path(ready_dir, file)
-      if (!file.exists(source)) next
-      target <- file.path(review_dir, file)
-      file.copy(source, target, overwrite = TRUE)
-      copied <- c(copied, target)
-    }
+
+  log_files <- list.files(
+    output_dir,
+    pattern = "(build-log|table-log|figure-log|errors?)[.]csv$",
+    full.names = FALSE,
+    ignore.case = TRUE
+  )
+  for (file in log_files) {
+    move_if_exists(file.path(output_dir, file), file.path(log_dir, file))
   }
-  readme <- file.path(review_dir, "README.txt")
+
+  unlink(file.path(output_dir, "_review"), recursive = TRUE, force = TRUE)
+
+  readme <- file.path(output_dir, "README.txt")
   writeLines(
     c(
-      "BET plot review outputs",
+      "BET results outputs",
       "",
-      "Open report-ready-figures.html first to review the report-ready figure set in one page.",
-      "Open report-map.html to review report-ready figures, tables, and QMD markers.",
-      "plot-report.qmd is kept as a detailed review source. plot-report.html is only present when PLOT_RENDER_REVIEW_HTML=true.",
-      "The full figure bundle remains under ../figures and table outputs under ../tables.",
+      "Start here:",
+      "- overview/report-ready-figures.html: one-page visual check of the report-ready figures.",
+      "- overview/report-map.html: figure/table map with QMD markers.",
+      "- report-ready/figures.qmd and report-ready/tables.qmd: section seeds consumed by the report task.",
       "",
-      paste("Files copied:", length(copied))
+      "Folders:",
+      "- figures/: image files referenced by report-ready QMD.",
+      "- tables/: table files referenced by report-ready QMD.",
+      "- indices/: payload, figure, table, optimization, and summary CSVs.",
+      "- logs/: build logs and errors when present.",
+      "- review/: detailed plot-report.qmd; plot-report.html only when PLOT_RENDER_REVIEW_HTML=true."
     ),
     readme
   )
-  invisible(data.frame(
-    file = basename(c(copied, readme)),
-    path = normalizePath(c(copied, readme), winslash = "/", mustWork = FALSE),
-    stringsAsFactors = FALSE
-  ))
+  invisible(readme)
 }
 
 short_error <- function(x) {
@@ -1133,7 +1161,11 @@ if (!is.finite(max_fisheries) || max_fisheries < 1L) max_fisheries <- 18L
 selection_file <- find_report_selection(input_dir)
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-unlink(file.path(out_dir, c("plot-report.html", "_review/plot-report.html")), force = TRUE)
+unlink(
+  file.path(out_dir, c("plot-report.html", "plot-report.qmd", "_review", "review/plot-report.html")),
+  recursive = TRUE,
+  force = TRUE
+)
 
 payload_index <- payloads(input_dir)
 if (!nrow(payload_index)) {
@@ -1194,7 +1226,7 @@ result <- write_clean_indices_and_review(
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
 write_report_ready_outputs(result, out_dir)
-organize_review_outputs(out_dir)
+organize_result_outputs(out_dir)
 
 message("Wrote ", length(unique(result$figures$figure)), " report-ready mfclshiny figure(s).")
 if (is.data.frame(result$log) && any(result$log$status == "error", na.rm = TRUE)) {
