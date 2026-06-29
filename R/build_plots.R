@@ -335,6 +335,8 @@ write_report_ready_figures_qmd <- function(figure_index, output_dir, ready_dir) 
   }
 
   lines <- c(
+    "\\clearpage",
+    "",
     "# Figures",
     "",
     "<!--",
