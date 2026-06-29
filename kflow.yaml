@@ -113,7 +113,7 @@ local_apps:
       ref_matches <- if (isTRUE(ref_is_sha)) {
         nzchar(installed_sha) && startsWith(tolower(installed_sha), tolower(mfclshiny_ref))
       } else {
-        FALSE
+        identical(installed_ref, mfclshiny_ref)
       }
       if (is.null(installed_desc) || !isTRUE(ref_matches)) {
         token <- Sys.getenv("GITHUB_PAT", Sys.getenv("GITHUB_TOKEN", ""))
