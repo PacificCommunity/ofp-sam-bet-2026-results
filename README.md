@@ -37,6 +37,7 @@ outputs/indices/table-index.csv
 outputs/indices/payload-index.csv
 outputs/indices/plot-summary.csv
 outputs/overview/report-ready-figures.html
+outputs/overview/interactive-model-viewer.html
 outputs/overview/report-map.html
 outputs/report-ready/figures.qmd
 outputs/report-ready/tables.qmd
@@ -46,11 +47,13 @@ outputs/README.txt
 ```
 
 Open `outputs/overview/report-ready-figures.html` to review all generated
-figures in a compact one-page gallery. Open `outputs/overview/report-map.html`
-to browse generated figures, tables, and QMD markers. The selection file
-controls inclusion, main/appendix placement, captions, and the captured Shiny
-input state. The report repo still receives editable QMD section seeds for
-final manual wording.
+figures in a compact one-page gallery. Open
+`outputs/overview/interactive-model-viewer.html` to share an offline,
+double-clickable interactive model viewer with no R or Shiny server required.
+Open `outputs/overview/report-map.html` to browse generated figures, tables,
+and QMD markers. The selection file controls inclusion, main/appendix
+placement, captions, and the captured Shiny input state. The report repo still
+receives editable QMD section seeds for final manual wording.
 
 `analysis-manifest.json` is deliberately small: it records available analysis
 layers such as model runs, likelihood profiles, Hessian checks, jitter, and

@@ -668,7 +668,40 @@ write_report_ready_figure_gallery <- function(figure_index, output_dir, overview
   invisible(file.path(overview_dir, "report-ready-figures.html"))
 }
 
-write_report_ready_outputs <- function(result, output_dir) {
+write_interactive_model_viewer_output <- function(input_dir, payload_index, output_dir, title) {
+  if (!"write_interactive_model_viewer" %in% getNamespaceExports("mfclshiny")) {
+    warning("mfclshiny::write_interactive_model_viewer is not available; skipping offline interactive viewer.", call. = FALSE)
+    return(NULL)
+  }
+  overview_dir <- file.path(output_dir, "overview")
+  dir.create(overview_dir, recursive = TRUE, showWarnings = FALSE)
+  folders <- if (is.data.frame(payload_index) && "model_folder" %in% names(payload_index)) {
+    payload_index$model_folder
+  } else {
+    NULL
+  }
+  out <- tryCatch(
+    mfclshiny::write_interactive_model_viewer(
+      model_dir = input_dir,
+      folders = folders,
+      output_dir = overview_dir,
+      file = "interactive-model-viewer.html",
+      title = sub("report-ready figures", "interactive model viewer", title, fixed = TRUE),
+      build_payloads = FALSE,
+      overwrite = TRUE
+    ),
+    error = function(e) {
+      warning("Interactive model viewer was not written: ", conditionMessage(e), call. = FALSE)
+      NULL
+    }
+  )
+  if (is.data.frame(out) && nrow(out)) {
+    out$relative_path <- file.path("overview", out$file)
+  }
+  out
+}
+
+write_report_ready_outputs <- function(result, output_dir, interactive_viewer = NULL) {
   ready_dir <- file.path(output_dir, "report-ready")
   overview_dir <- file.path(output_dir, "overview")
   dir.create(ready_dir, recursive = TRUE, showWarnings = FALSE)
@@ -685,6 +718,17 @@ write_report_ready_outputs <- function(result, output_dir) {
     purpose = c("report figure section seed", "report table section seed", "report-ready figure gallery", "read-only output map"),
     stringsAsFactors = FALSE
   )
+  if (is.data.frame(interactive_viewer) && nrow(interactive_viewer) && file.exists(interactive_viewer$path[[1L]])) {
+    index <- rbind(
+      index,
+      data.frame(
+        file = "../overview/interactive-model-viewer.html",
+        path = interactive_viewer$path[[1L]],
+        purpose = "offline interactive model viewer",
+        stringsAsFactors = FALSE
+      )
+    )
+  }
   utils::write.csv(index, file.path(ready_dir, "report-ready-files.csv"), row.names = FALSE)
   invisible(index)
 }
@@ -775,6 +819,7 @@ organize_result_outputs <- function(output_dir) {
       "",
       "Start here:",
       "- overview/report-ready-figures.html: one-page visual check of the report-ready figures.",
+      "- overview/interactive-model-viewer.html: double-click offline interactive model viewer.",
       "- overview/report-map.html: figure/table map with QMD markers.",
       "- report-ready/figures.qmd and report-ready/tables.qmd: section seeds consumed by the report task.",
       "",
@@ -1278,7 +1323,8 @@ result <- write_clean_indices_and_review(
 )
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
-write_report_ready_outputs(result, out_dir)
+interactive_viewer <- write_interactive_model_viewer_output(input_dir, payload_index, out_dir, title)
+write_report_ready_outputs(result, out_dir, interactive_viewer = interactive_viewer)
 organize_result_outputs(out_dir)
 
 message("Wrote ", length(unique(result$figures$figure)), " report-ready mfclshiny figure(s).")
