@@ -668,7 +668,11 @@ write_report_ready_figure_gallery <- function(figure_index, output_dir, overview
   invisible(file.path(overview_dir, "report-ready-figures.html"))
 }
 
-write_interactive_model_viewer_output <- function(input_dir, payload_index, output_dir, title) {
+write_interactive_model_viewer_output <- function(input_dir,
+                                                  payload_index,
+                                                  output_dir,
+                                                  title,
+                                                  viewer_title = "") {
   if (!"write_interactive_model_viewer" %in% getNamespaceExports("mfclshiny")) {
     warning("mfclshiny::write_interactive_model_viewer is not available; skipping offline interactive viewer.", call. = FALSE)
     return(NULL)
@@ -681,15 +685,21 @@ write_interactive_model_viewer_output <- function(input_dir, payload_index, outp
     NULL
   }
   out <- tryCatch(
-    mfclshiny::write_interactive_model_viewer(
-      model_dir = input_dir,
-      folders = folders,
-      output_dir = overview_dir,
-      file = "interactive-model-viewer.html",
-      title = sub("report-ready figures", "interactive model viewer", title, fixed = TRUE),
-      build_payloads = FALSE,
-      overwrite = TRUE
-    ),
+    {
+      viewer_title <- trimws(as.character(viewer_title %||% ""))
+      if (!nzchar(viewer_title)) {
+        viewer_title <- sub("report-ready figures", "interactive model viewer", title, fixed = TRUE)
+      }
+      mfclshiny::write_interactive_model_viewer(
+        model_dir = input_dir,
+        folders = folders,
+        output_dir = overview_dir,
+        file = "interactive-model-viewer.html",
+        title = viewer_title,
+        build_payloads = FALSE,
+        overwrite = TRUE
+      )
+    },
     error = function(e) {
       warning("Interactive model viewer was not written: ", conditionMessage(e), call. = FALSE)
       NULL
@@ -1249,6 +1259,7 @@ optimize_plot_figures <- function(output_dir, enabled = TRUE) {
 input_dir <- env("INPUT_DIR", "inputs")
 out_dir <- env("OUTPUT_DIR", "outputs")
 title <- env("PLOT_TITLE", "BET 2026 report-ready figures")
+interactive_viewer_title <- env("MFCLSHINY_INTERACTIVE_VIEWER_TITLE", "")
 species_code <- env("FLOW_SPECIES", "BET")
 species_label <- env("FLOW_SPECIES_LABEL", "bigeye tuna")
 assessment_year <- env("FLOW_ASSESSMENT_YEAR", "2026")
@@ -1323,7 +1334,13 @@ result <- write_clean_indices_and_review(
 )
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
-interactive_viewer <- write_interactive_model_viewer_output(input_dir, payload_index, out_dir, title)
+interactive_viewer <- write_interactive_model_viewer_output(
+  input_dir,
+  payload_index,
+  out_dir,
+  title,
+  viewer_title = interactive_viewer_title
+)
 write_report_ready_outputs(result, out_dir, interactive_viewer = interactive_viewer)
 organize_result_outputs(out_dir)
 

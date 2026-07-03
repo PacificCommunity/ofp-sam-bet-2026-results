@@ -88,6 +88,7 @@ run the same command.
 | `FLOW_GROUP` | `bet-2026-base` | Shared label for one stepwise/results/report chain. |
 | `PLOT_MAX_FISHERIES` | `18` | Limit fishery-level diagnostic plots per plot family. |
 | `PLOT_REPORT_SELECTION` | `report-selection.json` | Optional Shiny curation manifest to replay before rendering. |
+| `MFCLSHINY_INTERACTIVE_VIEWER_TITLE` | `BET 2026 Interactive Assessment Viewer` | Title passed to `mfclshiny::write_interactive_model_viewer()`. |
 | `PLOT_RENDER_REVIEW_HTML` | `false` | Render the large review HTML. Keep false for normal runs. |
 | `PLOT_OPTIMIZE_FIGURES` | `true` | Optimize generated plot files. |
 | `PLOT_PNGQUANT_QUALITY` | `60-85` | Lossy PNG quality range when `pngquant` is available. |
