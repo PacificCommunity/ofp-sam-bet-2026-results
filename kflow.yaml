@@ -1,9 +1,9 @@
 name: ofp-sam-bet-2026-results
 description: Build report-ready BET 2026 figures, tables, and report section seeds from upstream model payloads.
 command: bash run.sh
-docker_image: ghcr.io/pacificcommunity/tuna-flow:v2.0
+docker_image: ghcr.io/pacificcommunity/tuna-flow:v2.1
 resources:
-  cpus: 2
+  cpus: 4
   memory: 12GB
   disk: 8GB
 
@@ -28,8 +28,8 @@ env:
   TUNA_FLOW_RUNTIME_UPDATE: never
   KFLOW_REPO_RUNTIME_UPDATE: auto
   KFLOW_RUNTIME_PACKAGES: none
-  KFLOW_REPO_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@bcf4efd
-  MFCLSHINY_GITHUB_REF: bcf4efd
+  KFLOW_REPO_RUNTIME_PACKAGES: mfclshiny=PacificCommunity/mfclshiny@3615149ed9eb2998776fa1868d5c79b714d4b915
+  MFCLSHINY_GITHUB_REF: 3615149ed9eb2998776fa1868d5c79b714d4b915
   KFLOW_RUNTIME_GITHUB_AUTH: "true"
   KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
   MFCLSHINY_REPORT_DPI: "180"
@@ -37,6 +37,7 @@ env:
   PLOT_OPTIMIZE_FIGURES: "true"
   PLOT_OPTIMIZE_MODE: lossy
   PLOT_PNGQUANT_QUALITY: "60-85"
+  PLOT_OPTIMIZE_WORKERS: "4"
   PLOT_WEBP_FIGURES: "true"
   PLOT_WEBP_QUALITY: "72"
   PLOT_PDF_JPEG_FIGURES: "true"
@@ -66,7 +67,7 @@ local_apps:
       VECLIB_MAXIMUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: "true"
-      MFCLSHINY_GITHUB_REF: bcf4efd
+      MFCLSHINY_GITHUB_REF: 3615149ed9eb2998776fa1868d5c79b714d4b915
       MFCLSHINY_AUTO_LOAD: "true"
       MFCLSHINY_REPORT_DPI: "96"
       MFCLSHINY_OPTIMIZE_FIGURES: "true"
@@ -376,6 +377,7 @@ job_config:
     - PLOT_OPTIMIZE_MODE
     - PLOT_PNGQUANT_QUALITY
     - PLOT_PNGQUANT_SPEED
+    - PLOT_OPTIMIZE_WORKERS
     - PLOT_WEBP_FIGURES
     - PLOT_WEBP_QUALITY
     - PLOT_PDF_JPEG_FIGURES

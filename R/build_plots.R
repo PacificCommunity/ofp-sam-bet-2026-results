@@ -12,6 +12,14 @@ truthy_env <- function(name, default = TRUE) {
   tolower(value) %in% c("1", "true", "yes", "y", "on", "always")
 }
 
+int_env <- function(name, default = 1L, min = 1L, max = Inf) {
+  value <- suppressWarnings(as.integer(env(name, as.character(default))))
+  if (!is.finite(value)) value <- default
+  value <- max(as.integer(min), value)
+  if (is.finite(max)) value <- min(as.integer(max), value)
+  value
+}
+
 first_text <- function(x, default = "") {
   value <- tryCatch(as.character(x), error = function(e) character())
   if (!length(value) || is.na(value[[1L]]) || !nzchar(value[[1L]])) default else value[[1L]]
@@ -251,6 +259,20 @@ markdown_escape <- function(x) {
 qmd_option_escape <- function(x) {
   x <- as.character(x %||% "")
   gsub('"', '\\"', x, fixed = TRUE)
+}
+
+parallel_lapply <- function(x, fun, ..., workers = int_env("PLOT_OPTIMIZE_WORKERS", 1L)) {
+  workers <- min(length(x), workers)
+  if (workers <= 1L || .Platform$OS.type == "windows") {
+    return(lapply(x, fun, ...))
+  }
+  parallel::mclapply(
+    x,
+    fun,
+    ...,
+    mc.cores = workers,
+    mc.preschedule = FALSE
+  )
 }
 
 html_escape <- function(x) {
@@ -1195,20 +1217,32 @@ optimize_plot_figures <- function(output_dir, enabled = TRUE) {
   webp_q <- webp_quality()
   jpeg_q <- jpeg_quality()
   jpeg_sampling <- jpeg_sampling_factor()
+  workers <- int_env("PLOT_OPTIMIZE_WORKERS", 1L, max = length(files))
+  if (workers > 1L) {
+    message("Optimizing figures with ", workers, " worker(s).")
+  }
   pngquant_bin <- Sys.which("pngquant")
   convert_bin <- Sys.which("convert")
-  png_rows <- lapply(
+  png_rows <- parallel_lapply(
     files,
     optimize_png_file,
     output_dir = output_dir,
     mode = mode,
     quality = quality,
     pngquant_bin = pngquant_bin,
-    convert_bin = convert_bin
+    convert_bin = convert_bin,
+    workers = workers
   )
   png_result <- bind_rows_fill(png_rows)
   if (isTRUE(webp_enabled)) {
-    webp_rows <- lapply(files, create_webp_file, output_dir = output_dir, quality = webp_q, cwebp_bin = Sys.which("cwebp"))
+    webp_rows <- parallel_lapply(
+      files,
+      create_webp_file,
+      output_dir = output_dir,
+      quality = webp_q,
+      cwebp_bin = Sys.which("cwebp"),
+      workers = workers
+    )
     webp_result <- bind_rows_fill(webp_rows)
     result <- merge(png_result, webp_result, by = "file", all = TRUE, sort = FALSE)
   } else {
@@ -1221,13 +1255,14 @@ optimize_plot_figures <- function(output_dir, enabled = TRUE) {
     result$webp_reason <- "WebP disabled"
   }
   if (isTRUE(pdf_jpeg_enabled)) {
-    jpeg_rows <- lapply(
+    jpeg_rows <- parallel_lapply(
       files,
       create_pdf_jpeg_file,
       output_dir = output_dir,
       quality = jpeg_q,
       sampling_factor = jpeg_sampling,
-      convert_bin = convert_bin
+      convert_bin = convert_bin,
+      workers = workers
     )
     jpeg_result <- bind_rows_fill(jpeg_rows)
     result <- merge(result, jpeg_result, by = "file", all = TRUE, sort = FALSE)
