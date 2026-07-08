@@ -94,7 +94,7 @@ run the same command.
 | `PLOT_PNGQUANT_QUALITY` | `60-85` | Lossy PNG quality range when `pngquant` is available. |
 | `PLOT_WEBP_QUALITY` | `72` | WebP sidecar quality for HTML. |
 | `PLOT_JPEG_QUALITY` | `82` | JPEG sidecar quality for PDF rendering. |
-| `KFLOW_RUNTIME_PACKAGES` | `mfclkit=PacificCommunity/ofp-sam-mfclkit@main,mfclshiny=PacificCommunity/mfclshiny@c541c769a8161b57710c92a9300ae5fcb5d5a5a3` | Runtime packages checked and installed when the job starts. |
+| `KFLOW_RUNTIME_PACKAGES` | `mfclkit=PacificCommunity/ofp-sam-mfclkit@main,mfclshiny=PacificCommunity/mfclshiny@9ba0e02efbf76e1b0c58f5d939fd1c874dd3b169` | Runtime packages checked and installed when the job starts. |
 | `MFCLSHINY_SELECTION_PUBLISH_CMD` | unset | Optional local-app hook for saving and publishing a selection to the next curated layer. |
 | `KFLOW_REPORT_COMMIT_GENERATED` | `false` | Leave generated report inputs in Kflow artifacts rather than committing them back to the report repo. |
 | `KFLOW_REPORT_PUSH_GENERATED` | `false` | Do not push generated-input commits from the report task. |
