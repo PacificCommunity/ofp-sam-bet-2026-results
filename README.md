@@ -91,10 +91,13 @@ run the same command.
 | `MFCLSHINY_INTERACTIVE_VIEWER_TITLE` | `BET 2026 Interactive Assessment Viewer` | Title passed to `mfclshiny::write_interactive_model_viewer()`. |
 | `PLOT_RENDER_REVIEW_HTML` | `false` | Render the large review HTML. Keep false for normal runs. |
 | `PLOT_OPTIMIZE_FIGURES` | `true` | Optimize generated plot files. |
-| `PLOT_PNGQUANT_QUALITY` | `60-85` | Lossy PNG quality range when `pngquant` is available. |
-| `PLOT_WEBP_QUALITY` | `72` | WebP sidecar quality for HTML. |
-| `PLOT_JPEG_QUALITY` | `82` | JPEG sidecar quality for PDF rendering. |
-| `KFLOW_RUNTIME_PACKAGES` | `mfclkit=PacificCommunity/ofp-sam-mfclkit@main,mfclshiny=PacificCommunity/mfclshiny@e6b0e42a3e4b35543a5b1e8bf9bb3c64cb666b90` | Runtime packages checked and installed when the job starts. |
+| `PLOT_PNGQUANT_QUALITY` | `50-78` | Lossy PNG quality range when `pngquant` is available. Lower values keep large multi-model result bundles lighter. |
+| `PLOT_WEBP_QUALITY` | `66` | WebP sidecar quality for HTML. |
+| `PLOT_JPEG_QUALITY` | `76` | JPEG sidecar quality for PDF rendering. |
+| `MFCLSHINY_INTERACTIVE_INCLUDE_FITS` | `true` | Include length, weight, and CPUE fit panels in the offline interactive viewer. |
+| `MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT` | `Inf` | Maximum number of models with fit panels; `Inf` keeps all models. |
+| `MFCLSHINY_INTERACTIVE_JSON_DIGITS` | `5` | Significant digits embedded in the portable viewer payload. |
+| `KFLOW_RUNTIME_PACKAGES` | `mfclkit=PacificCommunity/ofp-sam-mfclkit@main,mfclshiny=PacificCommunity/mfclshiny@ba995733d134289006b67aa4747d19edbfb5bdb3` | Runtime packages checked and installed when the job starts. |
 | `MFCLSHINY_SELECTION_PUBLISH_CMD` | unset | Optional local-app hook for saving and publishing a selection to the next curated layer. |
 | `KFLOW_REPORT_COMMIT_GENERATED` | `false` | Leave generated report inputs in Kflow artifacts rather than committing them back to the report repo. |
 | `KFLOW_REPORT_PUSH_GENERATED` | `false` | Do not push generated-input commits from the report task. |

@@ -153,11 +153,11 @@ payloads <- function(input_dir) {
   files <- files[!vapply(folders, payload_is_child_payload, logical(1), all_folders = folders)]
   rows <- lapply(files, function(file) {
     folder <- dirname(file)
-    payload <- tryCatch(readRDS(file), error = function(e) NULL)
-    if (is.null(payload)) return(NULL)
     manifest <- payload_manifest(folder)
     label <- payload_label_from_manifest(manifest, basename(folder))
+    payload <- NULL
     if (identical(label, basename(folder))) {
+      payload <- tryCatch(readRDS(file), error = function(e) NULL)
       label <- payload_label(payload, basename(folder))
     }
     data.frame(
@@ -165,7 +165,7 @@ payloads <- function(input_dir) {
       model_folder = normalizePath(folder, winslash = "/", mustWork = FALSE),
       payload_file = normalizePath(file, winslash = "/", mustWork = FALSE),
       manifest_file = normalizePath(file.path(folder, "model_payload_manifest.json"), winslash = "/", mustWork = FALSE),
-      has_attached_checks = payload_has_attached_checks(payload),
+      has_attached_checks = if (!is.null(payload)) payload_has_attached_checks(payload) else FALSE,
       is_archived_input = payload_is_archived_input(folder),
       path_depth = length(payload_path_parts(folder)),
       stringsAsFactors = FALSE
@@ -723,37 +723,145 @@ write_interactive_model_viewer_output <- function(input_dir,
     return(NULL)
   }
   overview_dir <- file.path(output_dir, "overview")
+  log_dir <- file.path(output_dir, "logs")
   dir.create(overview_dir, recursive = TRUE, showWarnings = FALSE)
+  dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
   folders <- if (is.data.frame(payload_index) && "model_folder" %in% names(payload_index)) {
     payload_index$model_folder
   } else {
     NULL
   }
-  out <- tryCatch(
-    {
-      viewer_title <- trimws(as.character(viewer_title %||% ""))
-      if (!nzchar(viewer_title)) {
-        viewer_title <- sub("report-ready figures", "interactive model viewer", title, fixed = TRUE)
-      }
-      mfclshiny::write_interactive_model_viewer(
-        model_dir = input_dir,
-        folders = folders,
-        output_dir = overview_dir,
-        file = "interactive-model-viewer.html",
-        title = viewer_title,
-        build_payloads = FALSE,
-        overwrite = TRUE
-      )
-    },
-    error = function(e) {
-      warning("Interactive model viewer was not written: ", conditionMessage(e), call. = FALSE)
-      NULL
+  folders <- folders[nzchar(as.character(folders %||% "")) & !is.na(folders)]
+  if (!length(folders)) {
+    warning("Interactive model viewer was not written: no payload folders available.", call. = FALSE)
+    return(NULL)
+  }
+  viewer_title <- trimws(as.character(viewer_title %||% ""))
+  if (!nzchar(viewer_title)) {
+    viewer_title <- sub("report-ready figures", "interactive model viewer", title, fixed = TRUE)
+  }
+
+  fit_mode <- tolower(trimws(env("MFCLSHINY_INTERACTIVE_INCLUDE_FITS", "true")))
+  fit_limit_raw <- trimws(env("MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT", "Inf"))
+  fit_model_limit <- suppressWarnings(as.numeric(fit_limit_raw))
+  if (!length(fit_model_limit) || is.na(fit_model_limit[[1L]]) || identical(fit_mode, "all")) {
+    fit_model_limit <- Inf
+  }
+  fit_model_limit <- max(0, fit_model_limit[[1L]])
+  include_fits <- !fit_mode %in% c("0", "false", "no", "n", "off", "none")
+  if (fit_mode %in% c("1", "true", "yes", "y", "on", "always", "all", "full")) {
+    fit_model_limit <- Inf
+  }
+  message(
+    "Building interactive viewer in a clean R subprocess",
+    if (isTRUE(include_fits) && is.finite(fit_model_limit)) {
+      paste0(" with fit panels for the first ", fit_model_limit, " model(s).")
+    } else if (isTRUE(include_fits)) {
+      " with fit panels for all models."
+    } else {
+      " without fit panels."
     }
   )
+  json_digits <- suppressWarnings(as.numeric(env("MFCLSHINY_INTERACTIVE_JSON_DIGITS", "5")))
+  if (!length(json_digits) || !is.finite(json_digits[[1L]])) json_digits <- 5
+  json_digits <- max(3, min(8, json_digits[[1L]]))
+
+  payload_index_file <- file.path(output_dir, "indices", "payload-index.csv")
+  plot_data_file <- file.path(output_dir, "mfclshiny-report-depletion-data.csv")
+  status_file <- tempfile(pattern = "interactive-viewer-", fileext = ".rds")
+  worker_file <- tempfile(pattern = "interactive-viewer-", fileext = ".R")
+  worker_log <- file.path(log_dir, "interactive-viewer.log")
+  writeLines(c(
+    "`%||%` <- function(x, y) if (is.null(x) || length(x) == 0 || (length(x) == 1 && is.na(x))) y else x",
+    "call_with_supported_args <- function(fun, args) {",
+    "  supported <- names(formals(fun))",
+    "  if (!'...' %in% supported) args <- args[names(args) %in% supported]",
+    "  do.call(fun, args)",
+    "}",
+    "payload_index <- utils::read.csv(Sys.getenv('PAYLOAD_INDEX_FILE'), stringsAsFactors = FALSE)",
+    "plot_data_file <- Sys.getenv('PLOT_DATA_FILE')",
+    "plot_data <- if (file.exists(plot_data_file)) utils::read.csv(plot_data_file, stringsAsFactors = FALSE) else data.frame()",
+    "folders <- as.character(payload_index$model_folder %||% character())",
+    "folders <- folders[nzchar(folders) & !is.na(folders)]",
+    "out <- call_with_supported_args(",
+    "  mfclshiny::write_interactive_model_viewer,",
+    "  list(",
+    "    data = plot_data,",
+    "    model_dir = NULL,",
+    "    folders = folders,",
+    "    output_dir = Sys.getenv('VIEWER_OUTPUT_DIR'),",
+    "    file = 'interactive-model-viewer.html',",
+    "    title = Sys.getenv('VIEWER_TITLE'),",
+    "    build_payloads = FALSE,",
+    "    overwrite = TRUE,",
+    "    read_model_timeseries = FALSE,",
+    "    include_fits = identical(Sys.getenv('VIEWER_INCLUDE_FITS'), 'true'),",
+    "    fit_model_limit = suppressWarnings(as.numeric(Sys.getenv('VIEWER_FIT_MODEL_LIMIT', 'Inf'))),",
+    "    json_digits = suppressWarnings(as.numeric(Sys.getenv('VIEWER_JSON_DIGITS', '5')))",
+    "  )",
+    ")",
+    "saveRDS(out, Sys.getenv('VIEWER_STATUS_FILE'), compress = 'xz')"
+  ), worker_file)
+  status <- tryCatch(
+    system2(
+      file.path(R.home("bin"), "Rscript"),
+      worker_file,
+      stdout = worker_log,
+      stderr = worker_log,
+      env = c(
+        paste0("PAYLOAD_INDEX_FILE=", payload_index_file),
+        paste0("PLOT_DATA_FILE=", plot_data_file),
+        paste0("VIEWER_OUTPUT_DIR=", overview_dir),
+        paste0("VIEWER_TITLE=", viewer_title),
+        paste0("VIEWER_INCLUDE_FITS=", if (isTRUE(include_fits)) "true" else "false"),
+        paste0("VIEWER_FIT_MODEL_LIMIT=", if (is.finite(fit_model_limit)) fit_model_limit else "Inf"),
+        paste0("VIEWER_JSON_DIGITS=", json_digits),
+        paste0("VIEWER_STATUS_FILE=", status_file)
+      )
+    ),
+    error = function(e) {
+      warning("Interactive model viewer subprocess failed: ", conditionMessage(e), call. = FALSE)
+      1L
+    }
+  )
+  out <- NULL
+  if (identical(as.integer(status), 0L) && file.exists(status_file)) {
+    out <- tryCatch(readRDS(status_file), error = function(e) NULL)
+  }
+  if (!identical(as.integer(status), 0L) || !is.data.frame(out) || !nrow(out)) {
+    warning("Interactive model viewer was not written; see logs/interactive-viewer.log.", call. = FALSE)
+    return(NULL)
+  }
   if (is.data.frame(out) && nrow(out)) {
     out$relative_path <- file.path("overview", out$file)
+    out$include_fits <- include_fits
+    out$fit_model_limit <- fit_model_limit
   }
   out
+}
+
+append_interactive_ready_file <- function(output_dir, interactive_viewer) {
+  if (!is.data.frame(interactive_viewer) ||
+      !nrow(interactive_viewer) ||
+      !file.exists(interactive_viewer$path[[1L]])) {
+    return(invisible(NULL))
+  }
+  ready_file <- file.path(output_dir, "report-ready", "report-ready-files.csv")
+  if (!file.exists(ready_file)) return(invisible(NULL))
+  index <- tryCatch(utils::read.csv(ready_file, stringsAsFactors = FALSE), error = function(e) NULL)
+  if (!is.data.frame(index)) return(invisible(NULL))
+  index <- index[as.character(index$file) != "../overview/interactive-model-viewer.html", , drop = FALSE]
+  index <- rbind(
+    index,
+    data.frame(
+      file = "../overview/interactive-model-viewer.html",
+      path = interactive_viewer$path[[1L]],
+      purpose = "offline interactive model viewer",
+      stringsAsFactors = FALSE
+    )
+  )
+  utils::write.csv(index, ready_file, row.names = FALSE)
+  invisible(index)
 }
 
 write_report_ready_outputs <- function(result, output_dir, interactive_viewer = NULL) {
@@ -1392,6 +1500,13 @@ result <- write_clean_indices_and_review(
 )
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
+write_report_ready_outputs(result, out_dir, interactive_viewer = NULL)
+
+figure_count <- length(unique(result$figures$figure))
+has_build_errors <- is.data.frame(result$log) && any(result$log$status == "error", na.rm = TRUE)
+rm(result)
+invisible(gc(full = TRUE))
+
 interactive_viewer <- write_interactive_model_viewer_output(
   input_dir,
   payload_index,
@@ -1399,10 +1514,10 @@ interactive_viewer <- write_interactive_model_viewer_output(
   title,
   viewer_title = interactive_viewer_title
 )
-write_report_ready_outputs(result, out_dir, interactive_viewer = interactive_viewer)
+append_interactive_ready_file(out_dir, interactive_viewer)
 organize_result_outputs(out_dir)
 
-message("Wrote ", length(unique(result$figures$figure)), " report-ready mfclshiny figure(s).")
-if (is.data.frame(result$log) && any(result$log$status == "error", na.rm = TRUE)) {
+message("Wrote ", figure_count, " report-ready mfclshiny figure(s).")
+if (isTRUE(has_build_errors)) {
   message("Some registered plots failed; see mfclshiny-figure-build-log.csv.")
 }
