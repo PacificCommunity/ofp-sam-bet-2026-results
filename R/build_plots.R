@@ -95,6 +95,16 @@ payload_path_parts <- function(path) {
   parts[nzchar(parts)]
 }
 
+payload_is_diagnostic_leaf_name <- function(folder) {
+  name <- basename(normalizePath(folder, winslash = "/", mustWork = FALSE))
+  grepl("^jitter_seed_[0-9]+$", name) ||
+    grepl("^peel_[0-9]+$", name) ||
+    grepl("^part_[0-9]+$", name) ||
+    grepl("^rep_[0-9]+$", name) ||
+    grepl("^scalar_[-+]?[0-9.]+$", name) ||
+    name %in% c("truth", "truth_eval", "inputs", "refit", "sim", "recovery")
+}
+
 payload_is_child_payload <- function(folder, all_folders) {
   folder <- normalizePath(folder, winslash = "/", mustWork = FALSE)
   all_folders <- normalizePath(all_folders, winslash = "/", mustWork = FALSE)
@@ -137,6 +147,8 @@ payload_prefer_main_rows <- function(rows) {
 
 payloads <- function(input_dir) {
   files <- list.files(input_dir, pattern = "^model_payload[.]rds$", recursive = TRUE, full.names = TRUE)
+  folders <- normalizePath(dirname(files), winslash = "/", mustWork = FALSE)
+  files <- files[!vapply(folders, payload_is_diagnostic_leaf_name, logical(1))]
   folders <- normalizePath(dirname(files), winslash = "/", mustWork = FALSE)
   files <- files[!vapply(folders, payload_is_child_payload, logical(1), all_folders = folders)]
   rows <- lapply(files, function(file) {
