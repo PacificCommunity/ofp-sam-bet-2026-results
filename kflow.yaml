@@ -269,13 +269,83 @@ local_apps:
         if (!isTRUE(ok)) stop("Failed to stage local app input: ", from, call. = FALSE)
         invisible(to)
       }
+      path_parts <- function(path) strsplit(normalizePath(path, winslash = "/", mustWork = FALSE), "/", fixed = TRUE)[[1L]]
+      path_from_parts <- function(parts) {
+        parts <- as.character(parts)
+        if (!length(parts)) return("")
+        if (identical(parts[[1L]], "")) paste0("/", paste(parts[-1L], collapse = "/")) else do.call(file.path, as.list(parts))
+      }
+      diagnostic_anchor <- function(folder) {
+        parts <- path_parts(folder)
+        n <- length(parts)
+        if (n < 2L) return(NA_integer_)
+        for (i in seq_len(n - 1L)) {
+          current <- parts[[i]]
+          next_part <- parts[[i + 1L]]
+          if (identical(current, "jitter") && grepl("^jitter_seed_[0-9]+$", next_part)) return(i)
+          if (identical(current, "retro") && grepl("^peel_[0-9]+$", next_part)) return(i)
+          if (identical(current, "hessian") && grepl("^part_[0-9]+$", next_part)) return(i)
+          if (identical(current, "profile") && i + 2L <= n && grepl("^scalar_", parts[[i + 2L]])) return(i)
+          if (identical(current, "selftest") && next_part %in% c("refit", "sim", "truth", "truth_eval", "inputs", "recovery")) return(i)
+        }
+        NA_integer_
+      }
+      parent_model_dir <- function(folder) {
+        anchor <- diagnostic_anchor(folder)
+        if (!is.finite(anchor) || anchor <= 1L) return(normalizePath(folder, winslash = "/", mustWork = FALSE))
+        normalizePath(path_from_parts(path_parts(folder)[seq_len(anchor - 1L)]), winslash = "/", mustWork = FALSE)
+      }
+      canonical_model_dir <- function(folder) {
+        folder <- normalizePath(folder, winslash = "/", mustWork = FALSE)
+        parent <- parent_model_dir(folder)
+        if (!identical(parent, folder)) return(parent)
+        if (basename(folder) %in% c("jitter", "retro", "aspm", "hessian", "profile", "selftest", "projection") &&
+              file.exists(file.path(dirname(folder), "model_payload.rds"))) {
+          return(normalizePath(dirname(folder), winslash = "/", mustWork = FALSE))
+        }
+        folder
+      }
+      topmost_model_dirs <- function(paths) {
+        paths <- unique(vapply(paths, canonical_model_dir, character(1L), USE.NAMES = FALSE))
+        paths <- normalizePath(paths, winslash = "/", mustWork = FALSE)
+        paths <- paths[file.exists(file.path(paths, "model_payload.rds"))]
+        if (!length(paths)) return(paths)
+        keep <- vapply(paths, function(path) {
+          !any(vapply(setdiff(paths, path), function(parent) startsWith(path, paste0(parent, "/")), logical(1L)))
+        }, logical(1L))
+        paths[keep]
+      }
+      discover_model_dirs <- function(output_root) {
+        roots <- unique(normalizePath(
+          c(output_root, file.path(output_root, "models")),
+          winslash = "/",
+          mustWork = FALSE
+        ))
+        roots <- roots[dir.exists(roots)]
+        direct <- unique(unlist(lapply(roots, function(root) {
+          children <- list.dirs(root, full.names = TRUE, recursive = FALSE)
+          children[file.exists(file.path(children, "model_payload.rds"))]
+        }), use.names = FALSE))
+        direct <- topmost_model_dirs(direct)
+        if (length(direct)) return(direct)
+
+        payload_dirs <- unique(unlist(lapply(roots, function(root) {
+          dirs <- dirname(list.files(
+            root,
+            pattern = "^model_payload[.]rds$",
+            recursive = TRUE,
+            full.names = TRUE
+          ))
+          if (file.exists(file.path(root, "model_payload.rds"))) dirs <- c(root, dirs)
+          dirs
+        }), use.names = FALSE))
+        topmost_model_dirs(payload_dirs)
+      }
       stage_app_model_root <- function(output_root) {
         staging_root <- "/kflow/work/model-root"
         unlink(staging_root, recursive = TRUE, force = TRUE)
         dir.create(staging_root, recursive = TRUE, showWarnings = FALSE)
-        model_source <- if (has_model_children(output_root)) output_root else file.path(output_root, "models")
-        model_dirs <- list.dirs(model_source, full.names = TRUE, recursive = FALSE)
-        model_dirs <- model_dirs[file.exists(file.path(model_dirs, "model_payload.rds"))]
+        model_dirs <- discover_model_dirs(output_root)
         if (!length(model_dirs)) {
           stop("No model_payload.rds files found for local app under: ", output_root, call. = FALSE)
         }
