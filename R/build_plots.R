@@ -25,6 +25,13 @@ first_text <- function(x, default = "") {
   if (!length(value) || is.na(value[[1L]]) || !nzchar(value[[1L]])) default else value[[1L]]
 }
 
+clean_native_label <- function(x) {
+  x <- as.character(x)
+  x[is.na(x)] <- ""
+  x <- gsub("\\s*[[(]\\s*native(?:\\s+MFCL)?(?:\\s+old)?\\s*[])]", "", x, ignore.case = TRUE, perl = TRUE)
+  trimws(gsub("\\s+", " ", x))
+}
+
 bind_rows_fill <- function(rows) {
   rows <- rows[vapply(rows, function(x) is.data.frame(x) && nrow(x), logical(1))]
   if (!length(rows)) return(data.frame(stringsAsFactors = FALSE))
@@ -50,13 +57,13 @@ payload_label <- function(payload, fallback) {
   info <- tryCatch(payload$data$info, error = function(e) NULL)
   for (name in c("plot_label", "model_label", "model_token", "job_key")) {
     value <- first_text(tryCatch(reg[[name]], error = function(e) NULL))
-    if (nzchar(value)) return(value)
+    if (nzchar(value)) return(clean_native_label(value))
   }
   for (name in c("plot_label", "model_label", "model_token", "job_key")) {
     value <- first_text(tryCatch(info[[name]], error = function(e) NULL))
-    if (nzchar(value)) return(value)
+    if (nzchar(value)) return(clean_native_label(value))
   }
-  fallback
+  clean_native_label(fallback)
 }
 
 payload_manifest <- function(folder) {
@@ -77,9 +84,9 @@ payload_label_from_manifest <- function(manifest, fallback) {
   for (name in c("model_label", "plot_label", "model_token", "job_key")) {
     if (!name %in% names(manifest)) next
     value <- first_text(manifest[[name]][[1]], "")
-    if (nzchar(value)) return(value)
+    if (nzchar(value)) return(clean_native_label(value))
   }
-  fallback
+  clean_native_label(fallback)
 }
 
 payload_path_parts <- function(path) {
@@ -123,6 +130,7 @@ payload_prefer_main_rows <- function(rows) {
     group
   })
   out <- bind_rows_fill(out)
+  out$model_label <- clean_native_label(out$model_label)
   out <- out[order(out$model_label, out$path_depth, out$payload_file), , drop = FALSE]
   out[, setdiff(names(out), c("has_attached_checks", "path_depth", "is_archived_input")), drop = FALSE]
 }
@@ -176,6 +184,9 @@ find_report_selection <- function(input_dir) {
 write_payload_index <- function(payload_index, output_dir) {
   index_dir <- file.path(output_dir, "indices")
   dir.create(index_dir, recursive = TRUE, showWarnings = FALSE)
+  if (is.data.frame(payload_index) && "model_label" %in% names(payload_index)) {
+    payload_index$model_label <- clean_native_label(payload_index$model_label)
+  }
   utils::write.csv(payload_index, file.path(index_dir, "payload-index.csv"), row.names = FALSE)
   invisible(payload_index)
 }
