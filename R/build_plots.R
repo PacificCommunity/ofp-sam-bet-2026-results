@@ -899,6 +899,21 @@ write_report_ready_outputs <- function(result, output_dir, interactive_viewer = 
   invisible(index)
 }
 
+write_interactive_plot_data <- function(result, output_dir) {
+  plot_data <- result$data %||% NULL
+  if (!is.data.frame(plot_data) || !nrow(plot_data)) {
+    warning("No report key-quantity data was available for the interactive model viewer.", call. = FALSE)
+    return(invisible(""))
+  }
+  target <- file.path(output_dir, "mfclshiny-report-depletion-data.csv")
+  overview_target <- file.path(output_dir, "overview", "mfclshiny-report-depletion-data.csv")
+  dir.create(dirname(target), recursive = TRUE, showWarnings = FALSE)
+  dir.create(dirname(overview_target), recursive = TRUE, showWarnings = FALSE)
+  utils::write.csv(plot_data, target, row.names = FALSE)
+  utils::write.csv(plot_data, overview_target, row.names = FALSE)
+  invisible(target)
+}
+
 write_clean_indices_and_review <- function(result,
                                            output_dir,
                                            title,
@@ -1503,6 +1518,7 @@ result <- write_clean_indices_and_review(
 )
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
+write_interactive_plot_data(result, out_dir)
 write_report_ready_outputs(result, out_dir, interactive_viewer = NULL)
 
 figure_count <- length(unique(result$figures$figure))
