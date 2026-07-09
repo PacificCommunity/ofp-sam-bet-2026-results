@@ -899,8 +899,56 @@ write_report_ready_outputs <- function(result, output_dir, interactive_viewer = 
   invisible(index)
 }
 
-write_interactive_plot_data <- function(result, output_dir) {
+collect_interactive_plot_data <- function(result, payload_index) {
   plot_data <- result$data %||% NULL
+  if (is.data.frame(plot_data) && nrow(plot_data)) {
+    return(plot_data)
+  }
+  folders <- if (is.data.frame(payload_index) && "model_folder" %in% names(payload_index)) {
+    as.character(payload_index$model_folder)
+  } else {
+    character()
+  }
+  folders <- folders[nzchar(folders) & !is.na(folders)]
+  if (!length(folders)) {
+    return(data.frame(stringsAsFactors = FALSE))
+  }
+  collect_fun <- get0("mfclshiny_report_collect_data", envir = asNamespace("mfclshiny"), inherits = FALSE)
+  if (!is.function(collect_fun)) {
+    warning("mfclshiny_report_collect_data is not available; cannot rebuild interactive key-quantity data.", call. = FALSE)
+    return(data.frame(stringsAsFactors = FALSE))
+  }
+  collected <- tryCatch(
+    call_with_supported_args(
+      collect_fun,
+      list(
+        data = NULL,
+        model_dir = NULL,
+        folders = folders,
+        recursive = FALSE,
+        build_payloads = FALSE,
+        tag_report_year1 = "auto",
+        read_model_timeseries = TRUE
+      )
+    ),
+    error = function(e) {
+      warning("Could not collect interactive key-quantity data from payloads: ", conditionMessage(e), call. = FALSE)
+      NULL
+    }
+  )
+  plot_data <- tryCatch(collected$data, error = function(e) NULL)
+  if (is.data.frame(plot_data) && nrow(plot_data)) {
+    message(
+      "Collected ", format(nrow(plot_data), big.mark = ","),
+      " key-quantity value row(s) from ", length(unique(folders)), " payload folder(s)."
+    )
+    return(plot_data)
+  }
+  data.frame(stringsAsFactors = FALSE)
+}
+
+write_interactive_plot_data <- function(result, payload_index, output_dir) {
+  plot_data <- collect_interactive_plot_data(result, payload_index)
   if (!is.data.frame(plot_data) || !nrow(plot_data)) {
     warning("No report key-quantity data was available for the interactive model viewer.", call. = FALSE)
     return(invisible(""))
@@ -1518,7 +1566,7 @@ result <- write_clean_indices_and_review(
 )
 write_plot_summary(result, payload_index, out_dir)
 optimize_plot_figures(out_dir, enabled = optimize_figures)
-write_interactive_plot_data(result, out_dir)
+write_interactive_plot_data(result, payload_index, out_dir)
 write_report_ready_outputs(result, out_dir, interactive_viewer = NULL)
 
 figure_count <- length(unique(result$figures$figure))
