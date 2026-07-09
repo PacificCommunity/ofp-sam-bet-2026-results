@@ -27,9 +27,9 @@ env:
   KFLOW_RUNTIME_UPDATE: always
   TUNA_FLOW_RUNTIME_UPDATE: always
   KFLOW_REPO_RUNTIME_UPDATE: always
-  KFLOW_RUNTIME_PACKAGES: mfclkit=PacificCommunity/ofp-sam-mfclkit@main,mfclshiny=PacificCommunity/mfclshiny@ba995733d134289006b67aa4747d19edbfb5bdb3
+  KFLOW_RUNTIME_PACKAGES: mfclkit=PacificCommunity/ofp-sam-mfclkit@main,mfclshiny=PacificCommunity/mfclshiny@98a5cbc53b79f6d9e43ca5d44bef09cd16ca7b4a
   KFLOW_REPO_RUNTIME_PACKAGES: none
-  MFCLSHINY_GITHUB_REF: ba995733d134289006b67aa4747d19edbfb5bdb3
+  MFCLSHINY_GITHUB_REF: 98a5cbc53b79f6d9e43ca5d44bef09cd16ca7b4a
   KFLOW_RUNTIME_GITHUB_AUTH: "true"
   KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
   MFCLSHINY_REPORT_DPI: "150"
@@ -70,7 +70,7 @@ local_apps:
       VECLIB_MAXIMUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: "true"
-      MFCLSHINY_GITHUB_REF: ba995733d134289006b67aa4747d19edbfb5bdb3
+      MFCLSHINY_GITHUB_REF: 98a5cbc53b79f6d9e43ca5d44bef09cd16ca7b4a
       MFCLSHINY_AUTO_LOAD: "true"
       MFCLSHINY_INITIAL_RENDER: "true"
       MFCLSHINY_LIVE_UPDATE: "true"
@@ -282,25 +282,29 @@ local_apps:
       }
       diagnostic_leaf_name <- function(folder) {
         name <- basename(normalizePath(folder, winslash = "/", mustWork = FALSE))
-        grepl("^jitter_seed_[0-9]+$", name) ||
-          grepl("^peel_[0-9]+$", name) ||
-          grepl("^part_[0-9]+$", name) ||
-          grepl("^rep_[0-9]+$", name) ||
-          grepl("^scalar_[-+]?[0-9.]+$", name) ||
-          name %in% c("truth", "truth_eval", "inputs", "refit", "sim", "recovery")
+        name %in% c("jitter", "retro", "aspm", "hessian", "profile", "selftest", "projection",
+                    "truth", "truth_eval", "inputs", "refit", "sim", "recovery") ||
+          grepl("^(rep|replicate|peel|part|jitter[_-]?seed|seed|scalar|scaler|sc)[_-]?[-+]?[0-9.]+$", name, ignore.case = TRUE)
       }
       diagnostic_anchor <- function(folder) {
         parts <- path_parts(folder)
         n <- length(parts)
         if (n < 2L) return(NA_integer_)
+        seed_dir <- "^(jitter[_-]?seed|seed)[_-]?[0-9]+$"
+        peel_dir <- "^peel[_-]?[0-9]+$"
+        part_dir <- "^part[_-]?[0-9]+$"
+        scalar_dir <- "^(scalar|scaler|sc)[_-]?[-+]?[0-9.]+$"
+        selftest_dir <- "^(rep|replicate)[_-]?[0-9]+$"
         for (i in seq_len(n - 1L)) {
           current <- parts[[i]]
           next_part <- parts[[i + 1L]]
-          if (identical(current, "jitter") && grepl("^jitter_seed_[0-9]+$", next_part)) return(i)
-          if (identical(current, "retro") && grepl("^peel_[0-9]+$", next_part)) return(i)
-          if (identical(current, "hessian") && grepl("^part_[0-9]+$", next_part)) return(i)
-          if (identical(current, "profile") && i + 2L <= n && grepl("^scalar_", parts[[i + 2L]])) return(i)
-          if (identical(current, "selftest") && next_part %in% c("refit", "sim", "truth", "truth_eval", "inputs", "recovery")) return(i)
+          if (identical(current, "jitter") && grepl(seed_dir, next_part, ignore.case = TRUE)) return(i)
+          if (identical(current, "retro") && grepl(peel_dir, next_part, ignore.case = TRUE)) return(i)
+          if (identical(current, "hessian") && grepl(part_dir, next_part, ignore.case = TRUE)) return(i)
+          if (identical(current, "profile") && i + 2L <= n && grepl(scalar_dir, parts[[i + 2L]], ignore.case = TRUE)) return(i)
+          if (identical(current, "selftest") &&
+              (next_part %in% c("refit", "sim", "truth", "truth_eval", "inputs", "recovery") ||
+                 grepl(selftest_dir, next_part, ignore.case = TRUE))) return(i)
         }
         NA_integer_
       }
