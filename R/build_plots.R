@@ -802,6 +802,9 @@ write_interactive_model_viewer_output <- function(input_dir,
     ")",
     "saveRDS(out, Sys.getenv('VIEWER_STATUS_FILE'), compress = 'xz')"
   ), worker_file)
+  worker_env <- function(name, value) {
+    paste0(name, "=", shQuote(as.character(value %||% "")))
+  }
   status <- tryCatch(
     system2(
       file.path(R.home("bin"), "Rscript"),
@@ -809,14 +812,14 @@ write_interactive_model_viewer_output <- function(input_dir,
       stdout = worker_log,
       stderr = worker_log,
       env = c(
-        paste0("PAYLOAD_INDEX_FILE=", payload_index_file),
-        paste0("PLOT_DATA_FILE=", plot_data_file),
-        paste0("VIEWER_OUTPUT_DIR=", overview_dir),
-        paste0("VIEWER_TITLE=", viewer_title),
-        paste0("VIEWER_INCLUDE_FITS=", if (isTRUE(include_fits)) "true" else "false"),
-        paste0("VIEWER_FIT_MODEL_LIMIT=", if (is.finite(fit_model_limit)) fit_model_limit else "Inf"),
-        paste0("VIEWER_JSON_DIGITS=", json_digits),
-        paste0("VIEWER_STATUS_FILE=", status_file)
+        worker_env("PAYLOAD_INDEX_FILE", payload_index_file),
+        worker_env("PLOT_DATA_FILE", plot_data_file),
+        worker_env("VIEWER_OUTPUT_DIR", overview_dir),
+        worker_env("VIEWER_TITLE", viewer_title),
+        worker_env("VIEWER_INCLUDE_FITS", if (isTRUE(include_fits)) "true" else "false"),
+        worker_env("VIEWER_FIT_MODEL_LIMIT", if (is.finite(fit_model_limit)) fit_model_limit else "Inf"),
+        worker_env("VIEWER_JSON_DIGITS", json_digits),
+        worker_env("VIEWER_STATUS_FILE", status_file)
       )
     ),
     error = function(e) {
