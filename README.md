@@ -65,9 +65,10 @@ only for a one-off review run with `PLOT_RENDER_REVIEW_HTML=true`.
 
 ## Figure Size
 
-Normal Kflow runs optimize generated images for smaller artifacts and smaller
-reports. PNGs remain the fallback; WebP/JPEG sidecars are used where they help
-HTML or PDF output.
+Normal Kflow runs optimize generated images for smaller artifacts and reports.
+PNGs remain the print-quality fallback and smaller WebP companions serve HTML.
+JPEG conversion is off by default because the optimized BET PNGs were smaller
+in the full 106-figure benchmark.
 
 ## Run
 
@@ -93,11 +94,11 @@ run the same command.
 | `PLOT_OPTIMIZE_FIGURES` | `true` | Optimize generated plot files. |
 | `PLOT_PNGQUANT_QUALITY` | `50-78` | Lossy PNG quality range when `pngquant` is available. Lower values keep large multi-model result bundles lighter. |
 | `PLOT_WEBP_QUALITY` | `66` | WebP sidecar quality for HTML. |
-| `PLOT_JPEG_QUALITY` | `76` | JPEG sidecar quality for PDF rendering. |
+| `PLOT_PDF_JPEG_FIGURES` | `false` | Skip JPEG conversion; the measured BET bundle retained none. |
 | `MFCLSHINY_INTERACTIVE_INCLUDE_FITS` | `true` | Include length, weight, and CPUE fit panels in the offline interactive viewer. |
 | `MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT` | `Inf` | Maximum number of models with fit panels; `Inf` keeps all models. |
 | `MFCLSHINY_INTERACTIVE_JSON_DIGITS` | `5` | Significant digits embedded in the portable viewer payload. |
-| `KFLOW_RUNTIME_PACKAGES` | `mfclkit=PacificCommunity/ofp-sam-mfclkit@main,mfclshiny=PacificCommunity/mfclshiny@ba995733d134289006b67aa4747d19edbfb5bdb3` | Runtime packages checked and installed when the job starts. |
+| `KFLOW_REPO_RUNTIME_PACKAGES` | exact mfclkit and mfclshiny SHAs | Install only when the cached package does not match the tested release. |
 | `MFCLSHINY_SELECTION_PUBLISH_CMD` | unset | Optional local-app hook for saving and publishing a selection to the next curated layer. |
 | `KFLOW_REPORT_COMMIT_GENERATED` | `false` | Leave generated report inputs in Kflow artifacts rather than committing them back to the report repo. |
 | `KFLOW_REPORT_PUSH_GENERATED` | `false` | Do not push generated-input commits from the report task. |
