@@ -17,6 +17,12 @@ This task reads one or more upstream artifacts containing `model_payload.rds`,
 builds the report figure/table bundle, and passes that bundle to the report
 task.
 
+For a parallel sensitivity screen, give this task the completed per-model
+merge bundles (one bundle per model), not both the fit and merge archives. The
+results job keeps the attached Hessian diagnostic with each model and MFCL
+Shiny stages all unique input models together. Set `TRIGGER_NEXT=false` when
+the screen is for review rather than an automatic assessment report.
+
 The MFCL Shiny local app can now act as a curation layer. Open the app from a
 results job, adjust model selections, overlays, facets, uncertainty controls,
 and figure/table inclusion, then save `report-selection.json`. A follow-up

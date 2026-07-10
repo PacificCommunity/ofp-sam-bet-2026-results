@@ -118,6 +118,18 @@ payload_has_attached_checks <- function(payload) {
   is.list(attached) && length(attached) > 0
 }
 
+payload_folder_has_attached_checks <- function(folder, payload = NULL) {
+  # Merged Hessian/other check outputs carry a compact attachment marker next
+  # to the payload.  Prefer that bundle over the original fit when both are
+  # supplied to a single results job.  This avoids rendering the same model
+  # twice while retaining the fitted payload as a fallback if a merge failed.
+  if (file.exists(file.path(folder, "attached-checks-index.csv")) ||
+      file.exists(file.path(folder, "hessian", "hessian_info.rds"))) {
+    return(TRUE)
+  }
+  payload_has_attached_checks(payload)
+}
+
 payload_is_archived_input <- function(folder) {
   any(payload_path_parts(folder) %in% c("input_archive", "input_archives", "inputs_archive", "inputs_archives"))
 }
@@ -137,7 +149,14 @@ payload_prefer_main_rows <- function(rows) {
     if (any(!group$is_archived_input) && any(group$is_archived_input)) {
       group <- group[!group$is_archived_input, , drop = FALSE]
     }
-    group
+    if (any(group$has_attached_checks)) {
+      group <- group[group$has_attached_checks, , drop = FALSE]
+    }
+    # One results job may receive both each fit and its dependent check merge.
+    # Once the best source is selected, keep one deterministic payload per
+    # model label.  The merge is preferred above; the fit remains a fallback.
+    group <- group[order(group$path_depth, group$payload_file), , drop = FALSE]
+    group[1L, , drop = FALSE]
   })
   out <- bind_rows_fill(out)
   out$model_label <- clean_native_label(out$model_label)
@@ -165,7 +184,7 @@ payloads <- function(input_dir) {
       model_folder = normalizePath(folder, winslash = "/", mustWork = FALSE),
       payload_file = normalizePath(file, winslash = "/", mustWork = FALSE),
       manifest_file = normalizePath(file.path(folder, "model_payload_manifest.json"), winslash = "/", mustWork = FALSE),
-      has_attached_checks = if (!is.null(payload)) payload_has_attached_checks(payload) else FALSE,
+      has_attached_checks = payload_folder_has_attached_checks(folder, payload),
       is_archived_input = payload_is_archived_input(folder),
       path_depth = length(payload_path_parts(folder)),
       stringsAsFactors = FALSE

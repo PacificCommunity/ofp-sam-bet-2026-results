@@ -28,8 +28,8 @@ env:
   TUNA_FLOW_RUNTIME_UPDATE: never
   KFLOW_REPO_RUNTIME_UPDATE: auto
   KFLOW_RUNTIME_PACKAGES: none
-  KFLOW_REPO_RUNTIME_PACKAGES: mfclkit=PacificCommunity/ofp-sam-mfclkit@f5c55f747c44ec157298a99db4cfe682a9d18926,mfclshiny=PacificCommunity/mfclshiny@3684b7a7d1389d3d248f0a3238b3f222a6fcc1f3
-  MFCLSHINY_GITHUB_REF: 3684b7a7d1389d3d248f0a3238b3f222a6fcc1f3
+  KFLOW_REPO_RUNTIME_PACKAGES: mfclkit=PacificCommunity/ofp-sam-mfclkit@f5c55f747c44ec157298a99db4cfe682a9d18926,mfclshiny=PacificCommunity/mfclshiny@96f8ece9a1fed8e6f335f8e06d28fc5f541442e6
+  MFCLSHINY_GITHUB_REF: 96f8ece9a1fed8e6f335f8e06d28fc5f541442e6
   KFLOW_RUNTIME_GITHUB_AUTH: "true"
   KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
   MFCLSHINY_REPORT_DPI: "150"
@@ -59,7 +59,10 @@ local_apps:
     label: MFCL Shiny
     icon: chart-no-axes-combined
     runner: local-docker-ssh
-    memory: 8g
+    # The terminal-recruitment sensitivity result job can contain about 95
+    # compact model payloads.  Keep it in core mode and give the local app
+    # enough memory to open all of them together.
+    memory: 24g
     archive_sources:
       - inputs
     container_port: 3838
@@ -70,8 +73,9 @@ local_apps:
       VECLIB_MAXIMUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: "true"
-      MFCLSHINY_GITHUB_REF: 3684b7a7d1389d3d248f0a3238b3f222a6fcc1f3
+      MFCLSHINY_GITHUB_REF: 96f8ece9a1fed8e6f335f8e06d28fc5f541442e6
       MFCLSHINY_AUTO_LOAD: "true"
+      MFCLSHINY_LOAD_MODE: core
       MFCLSHINY_INITIAL_RENDER: "true"
       MFCLSHINY_LIVE_UPDATE: "false"
       MFCLSHINY_REPORT_DPI: "96"
@@ -79,7 +83,7 @@ local_apps:
       MFCLSHINY_PREVIEW_DPI: "48"
       MFCLSHINY_PREVIEW_MAX_WIDTH: "980"
       MFCLSHINY_PREVIEW_MAX_HEIGHT: "980"
-      MFCLSHINY_REPORT_CARD_LIMIT: "60"
+      MFCLSHINY_REPORT_CARD_LIMIT: "120"
     command: |
       Rscript - <<'RS'
       Sys.setenv(
@@ -335,9 +339,27 @@ local_apps:
         }, logical(1L))
         paths[keep]
       }
-      discover_model_dirs <- function(output_root) {
+      model_dir_priority <- function(path) {
+        score <- 0L
+        if (file.exists(file.path(path, "attached-checks-index.csv"))) score <- score + 100L
+        if (file.exists(file.path(path, "hessian", "hessian_info.rds"))) score <- score + 50L
+        score
+      }
+      prefer_model_dirs <- function(paths) {
+        if (!length(paths)) return(paths)
+        groups <- split(paths, basename(paths))
+        chosen <- vapply(groups, function(group) {
+          scores <- vapply(group, model_dir_priority, integer(1L))
+          group[order(-scores, group)][[1L]]
+        }, character(1L), USE.NAMES = FALSE)
+        sort(unique(chosen))
+      }
+      discover_model_dirs <- function(output_roots) {
+        output_roots <- unique(normalizePath(
+          as.character(output_roots), winslash = "/", mustWork = FALSE
+        ))
         roots <- unique(normalizePath(
-          c(output_root, file.path(output_root, "models")),
+          c(output_roots, file.path(output_roots, "models")),
           winslash = "/",
           mustWork = FALSE
         ))
@@ -347,7 +369,7 @@ local_apps:
           children[file.exists(file.path(children, "model_payload.rds"))]
         }), use.names = FALSE))
         direct <- topmost_model_dirs(direct)
-        if (length(direct)) return(direct)
+        if (length(direct)) return(prefer_model_dirs(direct))
 
         payload_dirs <- unique(unlist(lapply(roots, function(root) {
           dirs <- dirname(list.files(
@@ -359,34 +381,42 @@ local_apps:
           if (file.exists(file.path(root, "model_payload.rds"))) dirs <- c(root, dirs)
           dirs
         }), use.names = FALSE))
-        topmost_model_dirs(payload_dirs)
+        prefer_model_dirs(topmost_model_dirs(payload_dirs))
       }
-      stage_app_model_root <- function(output_root) {
+      stage_app_model_root <- function(output_roots) {
+        output_roots <- unique(normalizePath(
+          as.character(output_roots), winslash = "/", mustWork = FALSE
+        ))
+        output_roots <- output_roots[dir.exists(output_roots)]
         staging_root <- "/kflow/work/model-root"
         unlink(staging_root, recursive = TRUE, force = TRUE)
         dir.create(staging_root, recursive = TRUE, showWarnings = FALSE)
-        model_dirs <- discover_model_dirs(output_root)
+        model_dirs <- discover_model_dirs(output_roots)
         if (!length(model_dirs)) {
-          stop("No model_payload.rds files found for local app under: ", output_root, call. = FALSE)
+          stop("No model_payload.rds files found for local app inputs.", call. = FALSE)
         }
         for (model_dir in model_dirs) {
           link_or_copy(model_dir, file.path(staging_root, basename(model_dir)))
         }
-        region_map_dir <- file.path(output_root, "region-map")
-        if (dir.exists(region_map_dir)) {
-          link_or_copy(region_map_dir, file.path(staging_root, "region-map"))
+        region_map_dirs <- file.path(output_roots, "region-map")
+        region_map_dirs <- region_map_dirs[dir.exists(region_map_dirs)]
+        if (length(region_map_dirs)) {
+          link_or_copy(region_map_dirs[[1L]], file.path(staging_root, "region-map"))
         }
-        model_index <- file.path(output_root, "model-index.csv")
-        if (file.exists(model_index)) {
-          file.copy(model_index, file.path(staging_root, "model-index.csv"), overwrite = TRUE, copy.date = TRUE)
+        model_indices <- file.path(output_roots, "model-index.csv")
+        model_indices <- model_indices[file.exists(model_indices)]
+        # A single upstream bundle can retain its model order.  Multiple
+        # independent parents are instead scanned directly, which is safer
+        # than copying just one incomplete index.
+        if (length(model_indices) == 1L) {
+          file.copy(model_indices[[1L]], file.path(staging_root, "model-index.csv"), overwrite = TRUE, copy.date = TRUE)
         }
         staging_root
       }
-      output_root <- discover_output_root(
+      payload_root <- stage_app_model_root(c(
         Sys.getenv("KFLOW_LOCAL_APP_INPUT_DIR", "/kflow/inputs"),
         Sys.getenv("KFLOW_LOCAL_APP_OUTPUT_DIR", "/kflow/outputs")
-      )
-      payload_root <- stage_app_model_root(output_root)
+      ))
       mfclshiny::run_mfclshiny(
         model_dir = payload_root,
         export_dir = "/kflow/work/export",
