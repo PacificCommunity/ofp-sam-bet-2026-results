@@ -28,8 +28,9 @@ env:
   TUNA_FLOW_RUNTIME_UPDATE: never
   KFLOW_REPO_RUNTIME_UPDATE: auto
   KFLOW_RUNTIME_PACKAGES: none
-  KFLOW_REPO_RUNTIME_PACKAGES: mfclkit=PacificCommunity/ofp-sam-mfclkit@f5c55f747c44ec157298a99db4cfe682a9d18926,mfclshiny=PacificCommunity/mfclshiny@96f8ece9a1fed8e6f335f8e06d28fc5f541442e6
-  MFCLSHINY_GITHUB_REF: 96f8ece9a1fed8e6f335f8e06d28fc5f541442e6
+  KFLOW_REPO_RUNTIME_PACKAGES: mfclkit=PacificCommunity/ofp-sam-mfclkit@5075c9a4ab5e14b4b725e4135deabfb474da3681,mfclshiny=PacificCommunity/mfclshiny@65cf0aff15f5fd85ce96fda8c5bd89e9e2a6afe7
+  MFCLKIT_GITHUB_REF: 5075c9a4ab5e14b4b725e4135deabfb474da3681
+  MFCLSHINY_GITHUB_REF: 65cf0aff15f5fd85ce96fda8c5bd89e9e2a6afe7
   KFLOW_RUNTIME_GITHUB_AUTH: "true"
   KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "true"
   MFCLSHINY_REPORT_DPI: "150"
@@ -73,7 +74,8 @@ local_apps:
       VECLIB_MAXIMUM_THREADS: "1"
       NUMEXPR_NUM_THREADS: "1"
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: "true"
-      MFCLSHINY_GITHUB_REF: 96f8ece9a1fed8e6f335f8e06d28fc5f541442e6
+      MFCLKIT_GITHUB_REF: 5075c9a4ab5e14b4b725e4135deabfb474da3681
+      MFCLSHINY_GITHUB_REF: 65cf0aff15f5fd85ce96fda8c5bd89e9e2a6afe7
       MFCLSHINY_AUTO_LOAD: "true"
       MFCLSHINY_LOAD_MODE: core
       MFCLSHINY_INITIAL_RENDER: "true"
@@ -106,37 +108,14 @@ local_apps:
       base_libs <- setdiff(.libPaths(), normalizePath(lib, winslash = "/", mustWork = FALSE))
       .libPaths(unique(c(lib, base_libs)))
 
-      mfclshiny_ref <- Sys.getenv("MFCLSHINY_GITHUB_REF", "main")
       desc_field <- function(desc, name) {
         value <- tryCatch(desc[[name]], error = function(e) "")
         if (is.null(value) || !length(value) || is.na(value[[1L]])) "" else as.character(value[[1L]])
       }
-      installed_desc <- tryCatch(
-        suppressWarnings(utils::packageDescription("mfclshiny")),
-        error = function(e) NULL
-      )
-      if (length(installed_desc) == 1L && is.na(installed_desc[[1L]])) {
-        installed_desc <- NULL
-      }
-      installed_sha <- desc_field(installed_desc, "RemoteSha")
-      installed_ref <- desc_field(installed_desc, "RemoteRef")
-      ref_is_sha <- grepl("^[0-9a-f]{7,40}$", mfclshiny_ref, ignore.case = TRUE)
-      ref_matches <- if (isTRUE(ref_is_sha)) {
-        nzchar(installed_sha) && startsWith(tolower(installed_sha), tolower(mfclshiny_ref))
-      } else {
-        identical(installed_ref, mfclshiny_ref)
-      }
-      if (is.null(installed_desc) || !isTRUE(ref_matches)) {
-        token <- Sys.getenv("GITHUB_PAT", Sys.getenv("GITHUB_TOKEN", ""))
-        if (!nzchar(token)) {
-          stop("mfclshiny cache does not match MFCLSHINY_GITHUB_REF and no GitHub token was forwarded.", call. = FALSE)
-        }
-        git <- Sys.which("git")
-        if (!nzchar(git)) {
-          stop("git is required to install mfclshiny for the local app.", call. = FALSE)
-        }
-        source_dir <- tempfile(pattern = "mfclshiny-src-")
-        askpass <- tempfile(pattern = "mfclshiny-askpass-")
+      token <- Sys.getenv("GITHUB_PAT", Sys.getenv("GITHUB_TOKEN", ""))
+      git <- Sys.which("git")
+      write_askpass <- function(prefix) {
+        askpass <- tempfile(pattern = prefix)
         writeLines(c(
           "#!/bin/sh",
           "case \"$1\" in",
@@ -145,6 +124,34 @@ local_apps:
           "esac"
         ), askpass)
         Sys.chmod(askpass, mode = "0700")
+        askpass
+      }
+      ensure_github_package <- function(package, repo, ref, ref_env) {
+        if (!nzchar(ref)) stop(ref_env, " must not be empty.", call. = FALSE)
+        git_url <- paste0("https://github.com/PacificCommunity/", repo, ".git")
+        installed_description <- function() {
+          desc <- tryCatch(
+            suppressWarnings(utils::packageDescription(package, lib.loc = lib)),
+            error = function(e) NULL
+          )
+          if (length(desc) == 1L && is.na(desc[[1L]])) NULL else desc
+        }
+        matches_ref <- function(desc) {
+          installed_sha <- desc_field(desc, "RemoteSha")
+          nzchar(installed_sha) && startsWith(tolower(installed_sha), tolower(ref))
+        }
+        installed_desc <- installed_description()
+        if (!is.null(installed_desc) && isTRUE(matches_ref(installed_desc))) {
+          return(invisible(TRUE))
+        }
+        if (!nzchar(token)) {
+          stop(package, " cache does not match ", ref_env, " and no GitHub token was forwarded.", call. = FALSE)
+        }
+        if (!nzchar(git)) stop("git is required to install ", package, " for the local app.", call. = FALSE)
+
+        source_dir <- tempfile(pattern = paste0(package, "-src-"))
+        askpass <- write_askpass(paste0(package, "-askpass-"))
+        on.exit(unlink(c(source_dir, askpass), recursive = TRUE, force = TRUE), add = TRUE)
         run_git <- function(args) {
           status <- system2(
             git,
@@ -159,14 +166,13 @@ local_apps:
           )
           identical(as.integer(status), 0L)
         }
-        git_url <- "https://github.com/PacificCommunity/mfclshiny.git"
         if (!run_git(c("clone", "--quiet", "--depth", "50", git_url, source_dir))) {
-          stop("git clone failed for PacificCommunity/mfclshiny.", call. = FALSE)
+          stop("git clone failed for PacificCommunity/", repo, ".", call. = FALSE)
         }
-        if (!run_git(c("-C", source_dir, "checkout", "--quiet", mfclshiny_ref))) {
-          if (!run_git(c("-C", source_dir, "fetch", "--quiet", "--depth", "1", "origin", mfclshiny_ref)) ||
+        if (!run_git(c("-C", source_dir, "checkout", "--quiet", ref))) {
+          if (!run_git(c("-C", source_dir, "fetch", "--quiet", "--depth", "1", "origin", ref)) ||
               !run_git(c("-C", source_dir, "checkout", "--quiet", "FETCH_HEAD"))) {
-            stop("git checkout failed for PacificCommunity/mfclshiny@", mfclshiny_ref, call. = FALSE)
+            stop("git checkout failed for PacificCommunity/", repo, "@", ref, call. = FALSE)
           }
         }
         install_output <- system2(
@@ -177,46 +183,44 @@ local_apps:
         )
         install_status <- attr(install_output, "status")
         if (is.null(install_status)) install_status <- 0L
-        unlink(c(source_dir, askpass), recursive = TRUE, force = TRUE)
         if (!identical(as.integer(install_status), 0L)) {
           detail <- paste(tail(as.character(install_output), 30), collapse = "\n")
-          stop("R CMD INSTALL failed for mfclshiny\n", detail, call. = FALSE)
+          stop("R CMD INSTALL failed for ", package, "\n", detail, call. = FALSE)
         }
-        desc_path <- system.file("DESCRIPTION", package = "mfclshiny", lib.loc = lib)
+        desc_path <- system.file("DESCRIPTION", package = package, lib.loc = lib)
         if (nzchar(desc_path) && file.exists(desc_path)) {
           remote <- list(
             RemoteType = "github",
             RemoteHost = "api.github.com",
             RemoteUsername = "PacificCommunity",
-            RemoteRepo = "mfclshiny",
-            RemoteRef = mfclshiny_ref,
-            RemoteSha = mfclshiny_ref
+            RemoteRepo = repo,
+            RemoteRef = ref,
+            RemoteSha = ref
           )
           fields <- as.list(read.dcf(desc_path)[1, ])
           fields[names(remote)] <- remote
           write.dcf(as.data.frame(fields, stringsAsFactors = FALSE, check.names = FALSE), desc_path)
-          meta_path <- system.file("Meta", "package.rds", package = "mfclshiny", lib.loc = lib)
+          meta_path <- system.file("Meta", "package.rds", package = package, lib.loc = lib)
           if (file.exists(meta_path)) {
             meta <- readRDS(meta_path)
             meta[["DESCRIPTION"]][names(remote)] <- unlist(remote)
             saveRDS(meta, meta_path)
           }
         }
-        installed_desc <- tryCatch(
-          suppressWarnings(utils::packageDescription("mfclshiny", lib.loc = lib)),
-          error = function(e) NULL
-        )
-        installed_sha <- desc_field(installed_desc, "RemoteSha")
-        installed_ref <- desc_field(installed_desc, "RemoteRef")
-        ref_matches <- if (isTRUE(ref_is_sha)) {
-          nzchar(installed_sha) && startsWith(tolower(installed_sha), tolower(mfclshiny_ref))
-        } else {
-          identical(installed_ref, mfclshiny_ref)
+        installed_desc <- installed_description()
+        if (is.null(installed_desc) || !isTRUE(matches_ref(installed_desc))) {
+          stop(package, " does not match ", ref_env, ": ", ref, call. = FALSE)
         }
+        invisible(TRUE)
       }
-      if (is.null(installed_desc) || !isTRUE(ref_matches)) {
-        stop("mfclshiny does not match MFCLSHINY_GITHUB_REF: ", mfclshiny_ref, call. = FALSE)
-      }
+      ensure_github_package(
+        "mfclkit", "ofp-sam-mfclkit",
+        Sys.getenv("MFCLKIT_GITHUB_REF", "main"), "MFCLKIT_GITHUB_REF"
+      )
+      ensure_github_package(
+        "mfclshiny", "mfclshiny",
+        Sys.getenv("MFCLSHINY_GITHUB_REF", "main"), "MFCLSHINY_GITHUB_REF"
+      )
 
       dir.create("/kflow/work/export", recursive = TRUE, showWarnings = FALSE)
       has_model_children <- function(path) {
@@ -486,6 +490,7 @@ job_config:
     - KFLOW_REPO_RUNTIME_UPDATE
     - KFLOW_RUNTIME_PACKAGES
     - KFLOW_REPO_RUNTIME_PACKAGES
+    - MFCLKIT_GITHUB_REF
     - MFCLSHINY_GITHUB_REF
     - KFLOW_RUNTIME_GITHUB_AUTH
     - KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME

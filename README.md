@@ -105,6 +105,7 @@ run the same command.
 | `MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT` | `Inf` | Maximum number of models with fit panels; `Inf` keeps all models. |
 | `MFCLSHINY_INTERACTIVE_JSON_DIGITS` | `5` | Significant digits embedded in the portable viewer payload. |
 | `KFLOW_REPO_RUNTIME_PACKAGES` | exact mfclkit and mfclshiny SHAs | Install only when the cached package does not match the tested release. |
+| `MFCLKIT_GITHUB_REF` / `MFCLSHINY_GITHUB_REF` | reviewed commit SHAs | Keep the local MFCL Shiny app on the same diagnostic reader versions as the results job. |
 | `MFCLSHINY_SELECTION_PUBLISH_CMD` | unset | Optional local-app hook for saving and publishing a selection to the next curated layer. |
 | `KFLOW_REPORT_COMMIT_GENERATED` | `false` | Leave generated report inputs in Kflow artifacts rather than committing them back to the report repo. |
 | `KFLOW_REPORT_PUSH_GENERATED` | `false` | Do not push generated-input commits from the report task. |
