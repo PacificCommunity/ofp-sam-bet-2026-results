@@ -135,6 +135,7 @@ def submission_payload(job_numbers: list[int], latest: dict[str, dict]) -> dict:
             "MFCLSHINY_INTERACTIVE_VIEWER_TITLE": (
                 "BET 2026 LF conflict sensitivity viewer"
             ),
+            "MFCLSHINY_INTERACTIVE_INCLUDE_FITS": "limited",
             "MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT": "4",
             "LF_SENSITIVITY_EXPECTED_MODELS": "36",
             "PLOT_RENDER_REVIEW_HTML": "false",
