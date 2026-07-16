@@ -1527,11 +1527,13 @@ unlink(
   force = TRUE
 )
 
+source("R/lf_sensitivity_summary.R", local = FALSE)
 payload_index <- payloads(input_dir)
 if (!nrow(payload_index)) {
   stop("No model_payload.rds files found in upstream inputs.", call. = FALSE)
 }
 write_payload_index(payload_index, out_dir)
+lf_sensitivity_summary <- write_lf_sensitivity_summary(payload_index, out_dir)
 
 if (!requireNamespace("mfclshiny", quietly = TRUE) ||
     !"build_app_report_figures" %in% getNamespaceExports("mfclshiny")) {

@@ -104,3 +104,30 @@ run the same command.
 | `MFCLSHINY_INTERACTIVE_JSON_DIGITS` | `5` | Significant digits embedded in the portable viewer payload. |
 | `KFLOW_REPO_RUNTIME_PACKAGES` | exact mfclkit and mfclshiny SHAs | Install only when the cached package does not match the tested release. |
 | `MFCLKIT_GITHUB_REF` / `MFCLSHINY_GITHUB_REF` | reviewed commit SHAs | Keep the local MFCL Shiny app on the same diagnostic reader versions as the results job. |
+## LF conflict sensitivity results
+
+When the inputs are the completed per-model Hessian merge bundles from the
+BET 2026 LF conflict sensitivity experiment, the Results job also writes:
+
+- `outputs/overview/lf-conflict-sensitivity-summary.html`: a lightweight,
+  filterable and sortable review of all sensitivity settings and Hessian
+  diagnostics.
+- `outputs/tables/lf-conflict-sensitivity-summary.csv`: the same review as a
+  reusable table, including Hessian completion and negative eigenvalue counts.
+- `outputs/overview/interactive-model-viewer.html`: the full offline model
+  viewer, linked directly to the sensitivity summary.
+
+Supply one completed Hessian merge bundle per model. Do not supply both a fit
+job and its Hessian merge job, because the merge bundle already contains the
+fit payload.
+
+The reproducible Kflow submission is:
+
+```bash
+python3 scripts/submit_lf_conflict_results.py --dry-run
+python3 scripts/submit_lf_conflict_results.py
+```
+
+The script validates the complete 36-model grid and submits the Results job to
+Suva. It stops before submission if a model is missing a completed Hessian
+merge bundle.
