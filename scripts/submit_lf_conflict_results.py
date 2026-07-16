@@ -118,12 +118,12 @@ def submission_payload(job_numbers: list[int], latest: dict[str, dict]) -> dict:
     }
     return {
         "branch": "main",
-        "remote_user": os.environ.get("KFLOW_REMOTE_USER", "kyuhank"),
+        "remote_user": os.environ.get("LF_RESULTS_REMOTE_USER", "kyuhank"),
         "remote_host": os.environ.get(
-            "KFLOW_REMOTE_HOST", "suvofpsubmit.corp.spc.int"
+            "LF_RESULTS_REMOTE_HOST", "suvofpsubmit.corp.spc.int"
         ),
         "remote_base_dir": os.environ.get(
-            "KFLOW_REMOTE_BASE_DIR", "/home/kyuhank/KflowOutput"
+            "LF_RESULTS_REMOTE_BASE_DIR", "/home/kyuhank/KflowOutput"
         ),
         "disk": "60GB",
         "input_jobs": job_numbers,
