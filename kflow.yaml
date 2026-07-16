@@ -1,18 +1,16 @@
 name: ofp-sam-bet-2026-results
-description: Build report-ready BET 2026 figures, tables, and report section seeds from upstream model payloads.
+description: Build standalone BET 2026 result figures, tables, and interactive review outputs from upstream model payloads.
 command: bash run.sh
-docker_image: ghcr.io/pacificcommunity/tuna-flow:v2.2
+docker_image: ghcr.io/pacificcommunity/tuna-flow@sha256:71b97b4bdefa091a55284e45bbddfa330171a0674e8e4a32895424d6c8a100de
 resources:
   cpus: 4
   memory: 12GB
-  disk: 8GB
+  disk: 10GB
 
 env:
   JOB_TITLE: BET results
   JOB_DESCRIPTION: Build report-ready figures and tables from upstream model payloads.
   JOB_KEY: results
-  REPORT_JOB_TITLE: BET report
-  REPORT_JOB_DESCRIPTION: Render the assessment report from generated BET results.
   FLOW_GROUP: bet-2026-base
   PLOT_TITLE: BET 2026 report-ready figures
   MFCLSHINY_INTERACTIVE_VIEWER_TITLE: BET 2026 Interactive Assessment Viewer
@@ -21,8 +19,6 @@ env:
   FLOW_SPECIES_LABEL: bigeye tuna
   FLOW_ASSESSMENT_YEAR: "2026"
   PLOT_RENDER_REVIEW_HTML: "false"
-  REPORT_QMD: assessment-report.qmd
-  REPORT_FILE_STEM: bet-2026-report
   KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "true"
   KFLOW_RUNTIME_UPDATE: never
   TUNA_FLOW_RUNTIME_UPDATE: never
@@ -47,9 +43,6 @@ env:
   MFCLSHINY_INTERACTIVE_INCLUDE_FITS: "true"
   MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT: Inf
   MFCLSHINY_INTERACTIVE_JSON_DIGITS: "5"
-  KFLOW_REPORT_COMMIT_GENERATED: "false"
-  KFLOW_REPORT_PUSH_GENERATED: "false"
-  KFLOW_REPORT_PUBLISH_REQUIRED: "false"
 input_jobs:
   - report: ofp-sam-bet-2026-stepwise
     latest: 1
@@ -430,46 +423,12 @@ local_apps:
         launch.browser = FALSE
       )
       RS
-triggers:
-  on_success:
-    - key: report-from-results
-      report: ofp-sam-bet-2026-report
-      input_jobs:
-        - "{{ job.job_number }}"
-      env:
-        FLOW_GROUP: "{{ job.config.FLOW_GROUP }}"
-        JOB_TITLE: "{{ job.config.REPORT_JOB_TITLE }}"
-        JOB_KEY: report
-        JOB_DESCRIPTION: "{{ job.config.REPORT_JOB_DESCRIPTION }}"
-        RESULTS_JOB_ID: "{{ job.job_number }}"
-        RESULTS_JOB_IDS: "{{ job.job_number }}"
-        FLOW_SPECIES: "{{ job.config.FLOW_SPECIES }}"
-        FLOW_SPECIES_LABEL: "{{ job.config.FLOW_SPECIES_LABEL }}"
-        FLOW_ASSESSMENT_YEAR: "{{ job.config.FLOW_ASSESSMENT_YEAR }}"
-        REPORT_QMD: "{{ job.config.REPORT_QMD }}"
-        REPORT_FILE_STEM: "{{ job.config.REPORT_FILE_STEM }}"
-        KFLOW_REPORT_COMMIT_GENERATED: "{{ job.config.KFLOW_REPORT_COMMIT_GENERATED }}"
-        KFLOW_REPORT_PUSH_GENERATED: "{{ job.config.KFLOW_REPORT_PUSH_GENERATED }}"
-        KFLOW_REPORT_PUBLISH_REQUIRED: "{{ job.config.KFLOW_REPORT_PUBLISH_REQUIRED }}"
-        KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES: "{{ job.config.KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES }}"
-        KFLOW_RUNTIME_UPDATE: "{{ job.config.KFLOW_RUNTIME_UPDATE }}"
-        TUNA_FLOW_RUNTIME_UPDATE: "{{ job.config.TUNA_FLOW_RUNTIME_UPDATE }}"
-        KFLOW_RUNTIME_PACKAGES: none
-        KFLOW_REPO_RUNTIME_PACKAGES: none
-        KFLOW_RUNTIME_GITHUB_AUTH: "{{ job.config.KFLOW_RUNTIME_GITHUB_AUTH }}"
-        KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME: "{{ job.config.KFLOW_FORWARD_GITHUB_TOKEN_TO_RUNTIME }}"
-      tags:
-        auto: "true"
-        stage: report
 job_config:
   optional:
-    - TRIGGER_NEXT
     - FLOW_GROUP
     - JOB_TITLE
     - JOB_DESCRIPTION
     - JOB_KEY
-    - REPORT_JOB_TITLE
-    - REPORT_JOB_DESCRIPTION
     - PLOT_TITLE
     - MFCLSHINY_INTERACTIVE_VIEWER_TITLE
     - PLOT_MAX_FISHERIES
@@ -478,11 +437,6 @@ job_config:
     - FLOW_SPECIES_LABEL
     - FLOW_ASSESSMENT_YEAR
     - PLOT_RENDER_REVIEW_HTML
-    - REPORT_QMD
-    - REPORT_FILE_STEM
-    - KFLOW_REPORT_COMMIT_GENERATED
-    - KFLOW_REPORT_PUSH_GENERATED
-    - KFLOW_REPORT_PUBLISH_REQUIRED
     - REPORT_READY_PATH_PREFIX
     - KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES
     - KFLOW_RUNTIME_UPDATE
@@ -497,7 +451,6 @@ job_config:
     - MFCLSHINY_REPORT_DPI
     - MFCLSHINY_OPTIMIZE_FIGURES
     - MFCLSHINY_REPORT_SELECTION_FILE
-    - MFCLSHINY_SELECTION_PUBLISH_CMD
     - PLOT_OPTIMIZE_FIGURES
     - PLOT_OPTIMIZE_MODE
     - PLOT_PNGQUANT_QUALITY

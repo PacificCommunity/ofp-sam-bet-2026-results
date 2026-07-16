@@ -4,24 +4,23 @@
   <a href="kflow.yaml"><img src="kflow-ready.svg" alt="Kflow ready task"></a>
 </p>
 
-Kflow task for building report-ready BET 2026 figures, tables, captions, and
-QMD section seeds from upstream model payloads.
+Kflow task for building standalone BET 2026 figures, tables, captions, and
+interactive review outputs from upstream model payloads.
 
 ## Workflow Role
 
 ```text
-ofp-sam-bet-2026-stepwise -> ofp-sam-bet-2026-results -> ofp-sam-bet-2026-report
+ofp-sam-bet-2026-stepwise -> ofp-sam-bet-2026-results
 ```
 
-This task reads one or more upstream artifacts containing `model_payload.rds`,
-builds the report figure/table bundle, and passes that bundle to the report
-task.
+This task reads one or more upstream artifacts containing `model_payload.rds`
+and builds its own figure/table review bundle. It does not trigger, update,
+commit to, or push to the report repository.
 
 For a parallel sensitivity screen, give this task the completed per-model
 merge bundles (one bundle per model), not both the fit and merge archives. The
 results job keeps the attached Hessian diagnostic with each model and MFCL
-Shiny stages all unique input models together. Set `TRIGGER_NEXT=false` when
-the screen is for review rather than an automatic assessment report.
+Shiny stages all unique input models together.
 
 The MFCL Shiny local app can now act as a curation layer. Open the app from a
 results job, adjust model selections, overlays, facets, uncertainty controls,
@@ -58,8 +57,8 @@ figures in a compact one-page gallery. Open
 double-clickable interactive model viewer with no R or Shiny server required.
 Open `outputs/overview/report-map.html` to browse generated figures, tables,
 and QMD markers. The selection file controls inclusion, main/appendix
-placement, captions, and the captured Shiny input state. The report repo still
-receives editable QMD section seeds for final manual wording.
+placement, captions, and the captured Shiny input state. These outputs remain
+inside the Results job for review only.
 
 `analysis-manifest.json` is deliberately small: it records available analysis
 layers such as model runs, likelihood profiles, Hessian checks, jitter, and
@@ -91,8 +90,7 @@ run the same command.
 
 | Field | Typical value | Purpose |
 | --- | --- | --- |
-| `TRIGGER_NEXT` | `true` | Launch the report task after results complete. |
-| `FLOW_GROUP` | `bet-2026-base` | Shared label for one stepwise/results/report chain. |
+| `FLOW_GROUP` | `bet-2026-base` | Shared label for one stepwise/results review chain. |
 | `PLOT_MAX_FISHERIES` | `18` | Limit fishery-level diagnostic plots per plot family. |
 | `PLOT_REPORT_SELECTION` | `report-selection.json` | Optional Shiny curation manifest to replay before rendering. |
 | `MFCLSHINY_INTERACTIVE_VIEWER_TITLE` | `BET 2026 Interactive Assessment Viewer` | Title passed to `mfclshiny::write_interactive_model_viewer()`. |
@@ -106,7 +104,3 @@ run the same command.
 | `MFCLSHINY_INTERACTIVE_JSON_DIGITS` | `5` | Significant digits embedded in the portable viewer payload. |
 | `KFLOW_REPO_RUNTIME_PACKAGES` | exact mfclkit and mfclshiny SHAs | Install only when the cached package does not match the tested release. |
 | `MFCLKIT_GITHUB_REF` / `MFCLSHINY_GITHUB_REF` | reviewed commit SHAs | Keep the local MFCL Shiny app on the same diagnostic reader versions as the results job. |
-| `MFCLSHINY_SELECTION_PUBLISH_CMD` | unset | Optional local-app hook for saving and publishing a selection to the next curated layer. |
-| `KFLOW_REPORT_COMMIT_GENERATED` | `false` | Leave generated report inputs in Kflow artifacts rather than committing them back to the report repo. |
-| `KFLOW_REPORT_PUSH_GENERATED` | `false` | Do not push generated-input commits from the report task. |
-| `KFLOW_REPORT_PUBLISH_REQUIRED` | `false` | Do not fail an otherwise successful report render because generated-input publishing is unavailable. |
