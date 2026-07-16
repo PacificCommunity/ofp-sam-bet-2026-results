@@ -46,6 +46,16 @@ interactive_viewer <- write_interactive_model_viewer_output(
 if (!is.data.frame(interactive_viewer) || !nrow(interactive_viewer)) {
   stop("The offline interactive model viewer was not created.", call. = FALSE)
 }
+viewer_html <- paste(
+  readLines(interactive_viewer$path[[1L]], warn = FALSE, encoding = "UTF-8"),
+  collapse = "\n"
+)
+if (!grepl('"key"\\s*:\\s*"key_quantities"', viewer_html, perl = TRUE)) {
+  stop(
+    "The offline interactive model viewer does not contain key quantities.",
+    call. = FALSE
+  )
+}
 
 plot_summary <- data.frame(
   payloads = nrow(payload_index),
