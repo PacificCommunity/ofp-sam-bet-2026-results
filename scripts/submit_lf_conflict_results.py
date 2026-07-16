@@ -17,6 +17,8 @@ HESSIAN_MERGE_TASK = (
     "check-hessian-merge"
 )
 FIT_TASK = "ofp-sam-bet-2026-lf-conflict-sensitivities-standalone"
+MFCLKIT_REF = "dfb70989557d5afd6f7eed06e247b8347f7a2767"
+MFCLSHINY_REF = "eb08178092975d6d7d640dfe579c29be5bc447c5"
 
 
 def expected_scenarios() -> list[str]:
@@ -137,6 +139,11 @@ def submission_payload(job_numbers: list[int], latest: dict[str, dict]) -> dict:
             ),
             "MFCLSHINY_INTERACTIVE_INCLUDE_FITS": "limited",
             "MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT": "4",
+            "MFCLSHINY_GITHUB_REF": MFCLSHINY_REF,
+            "KFLOW_REPO_RUNTIME_PACKAGES": (
+                f"mfclkit=PacificCommunity/ofp-sam-mfclkit@{MFCLKIT_REF},"
+                f"mfclshiny=PacificCommunity/mfclshiny@{MFCLSHINY_REF}"
+            ),
             "LF_SENSITIVITY_EXPECTED_MODELS": "36",
             "PLOT_RENDER_REVIEW_HTML": "false",
             "RESULTS_VIEWER_ONLY": "true",
