@@ -1507,6 +1507,7 @@ optimize_plot_figures <- function(output_dir, enabled = TRUE) {
   invisible(result)
 }
 
+if (!truthy_env("BUILD_PLOTS_DEFINITIONS_ONLY", FALSE)) {
 input_dir <- env("INPUT_DIR", "inputs")
 out_dir <- env("OUTPUT_DIR", "outputs")
 title <- env("PLOT_TITLE", "BET 2026 report-ready figures")
@@ -1608,4 +1609,5 @@ organize_result_outputs(out_dir)
 message("Wrote ", figure_count, " report-ready mfclshiny figure(s).")
 if (isTRUE(has_build_errors)) {
   message("Some registered plots failed; see mfclshiny-figure-build-log.csv.")
+}
 }

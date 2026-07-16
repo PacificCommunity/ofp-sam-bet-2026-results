@@ -131,3 +131,7 @@ python3 scripts/submit_lf_conflict_results.py
 The script validates the complete 36-model grid and submits the Results job to
 Suva. It stops before submission if a model is missing a completed Hessian
 merge bundle.
+
+The LF sensitivity submission uses the viewer-only execution path. It avoids
+building the complete report-figure registry for every model while preserving
+the 36-model offline viewer, the Kflow MFCL Shiny app, and the Hessian summary.

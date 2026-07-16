@@ -333,4 +333,11 @@ echo "Input directory: ${INPUT_DIR}"
 echo "Output directory: ${OUT_DIR}"
 
 prepare_runtime_packages
-Rscript R/build_plots.R
+case "${RESULTS_VIEWER_ONLY:-false}" in
+  1|true|TRUE|yes|YES|on|ON)
+    Rscript R/build_lf_sensitivity_viewer.R
+    ;;
+  *)
+    Rscript R/build_plots.R
+    ;;
+esac
