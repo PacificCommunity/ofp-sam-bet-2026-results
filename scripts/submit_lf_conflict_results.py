@@ -33,20 +33,24 @@ def expected_scenarios() -> list[str]:
 
 
 class KflowAPI:
-    def __init__(self, base_url: str, token: str) -> None:
+    def __init__(self, base_url: str, token: str, github_token: str = "") -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.github_token = github_token.strip()
 
     def request(self, method: str, path: str, payload: dict | None = None) -> dict:
         body = None if payload is None else json.dumps(payload).encode("utf-8")
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json",
+        }
+        if self.github_token:
+            headers["X-GitHub-Token"] = self.github_token
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=body,
             method=method,
-            headers={
-                "Authorization": f"Bearer {self.token}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
         )
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
@@ -179,7 +183,11 @@ def main() -> int:
     if not token:
         raise RuntimeError("KFLOW_API_TOKEN is required.")
 
-    api = KflowAPI(args.api_url, token)
+    api = KflowAPI(
+        args.api_url,
+        token,
+        github_token=os.environ.get("KFLOW_GITHUB_TOKEN", ""),
+    )
     job_numbers, latest = completed_hessian_merges(api)
     payload = submission_payload(job_numbers, latest)
     print(
