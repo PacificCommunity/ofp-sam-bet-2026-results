@@ -291,10 +291,20 @@ for (spec in missing) {
     message("[kflow-runtime-update] Runtime package install failed for ", spec$package, ": ", conditionMessage(err))
   }
 }
-missing_after <- specs[!vapply(specs, function(spec) requireNamespace(spec$package, quietly = TRUE), logical(1))]
-if (length(missing_after) && truthy(Sys.getenv("KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES", "false"))) {
-  message("[kflow-runtime-update] Required runtime package(s) unavailable: ",
-          paste(vapply(missing_after, function(spec) spec$package, character(1)), collapse = ", "))
+matches_requested_ref <- function(spec) {
+  desc <- installed_desc(spec$package)
+  if (is.null(desc)) return(FALSE)
+  installed_sha <- desc_field(desc, "RemoteSha")
+  if (grepl("^[0-9a-f]{7,40}$", spec$ref, ignore.case = TRUE)) {
+    return(nzchar(installed_sha) && startsWith(tolower(installed_sha), tolower(spec$ref)))
+  }
+  installed_ref <- desc_field(desc, "RemoteRef")
+  nzchar(installed_sha) && identical(installed_ref, spec$ref)
+}
+unresolved_after <- specs[!vapply(specs, matches_requested_ref, logical(1))]
+if (length(unresolved_after) && truthy(Sys.getenv("KFLOW_RUNTIME_REQUIRE_PRIVATE_PACKAGES", "false"))) {
+  message("[kflow-runtime-update] Required runtime package(s) unavailable at the requested ref: ",
+          paste(vapply(unresolved_after, function(spec) paste0(spec$package, "@", spec$ref), character(1)), collapse = ", "))
   quit(save = "no", status = 44)
 }
 quit(save = "no", status = 0)
