@@ -258,22 +258,46 @@ write_remote_metadata <- function(package, repo, ref, sha, lib) {
   }
   invisible(TRUE)
 }
+retry_runtime_operation <- function(label, operation, attempts = 3L) {
+  attempts <- max(1L, as.integer(attempts))
+  last_error <- NULL
+  for (attempt in seq_len(attempts)) {
+    value <- tryCatch(operation(), error = function(e) {
+      last_error <<- e
+      NULL
+    })
+    if (!is.null(value)) return(value)
+    if (attempt < attempts) {
+      delay <- min(5L, attempt * 2L)
+      message("[kflow-runtime-update] ", label, " failed on attempt ", attempt,
+              "/", attempts, ": ", conditionMessage(last_error),
+              "; retrying in ", delay, " seconds.")
+      Sys.sleep(delay)
+    }
+  }
+  stop(last_error)
+}
 for (spec in missing) {
   message("[kflow-runtime-update] Installing/updating runtime package ", spec$package, " from ", spec$repo, "@", spec$ref, ".")
   err <- tryCatch({
     ref_is_sha <- grepl("^[0-9a-f]{7,40}$", spec$ref, ignore.case = TRUE)
-    source_path <- if (ref_is_sha) {
-      tryCatch(
-        download_github_archive(spec$repo, spec$ref),
-        error = function(err) {
-          message("[kflow-runtime-update] Runtime archive download failed for ", spec$package,
-                  "; trying git clone fallback.")
+    source_path <- retry_runtime_operation(
+      paste0("Source acquisition for ", spec$package),
+      function() {
+        if (ref_is_sha) {
+          tryCatch(
+            download_github_archive(spec$repo, spec$ref),
+            error = function(err) {
+              message("[kflow-runtime-update] Runtime archive download failed for ", spec$package,
+                      "; trying git clone fallback.")
+              clone_github_source(spec$repo, spec$ref)
+            }
+          )
+        } else {
           clone_github_source(spec$repo, spec$ref)
         }
-      )
-    } else {
-      clone_github_source(spec$repo, spec$ref)
-    }
+      }
+    )
     resolved_sha <- attr(source_path, "kflow_resolved_sha", exact = TRUE)
     if (is.null(resolved_sha) || !nzchar(resolved_sha)) {
       resolved_sha <- spec$ref
