@@ -19,6 +19,48 @@ final_pars <- sort(unique(list.files(
   full.names = TRUE
 )))
 model_dirs <- sort(unique(dirname(final_pars)))
+payload_root <- file.path(input_dir, "native-payloads")
+
+safe_slug <- function(value, fallback) {
+  value <- tolower(trimws(as.character(value)))
+  value <- gsub("[^a-z0-9.]+", "-", value)
+  value <- gsub("^-+|-+$", "", value)
+  if (!nzchar(value)) fallback else value
+}
+
+sensitivity_metadata <- function(model_dir) {
+  path <- file.path(model_dir, "sensitivity-metadata.csv")
+  if (!file.exists(path)) return(list())
+  out <- tryCatch(utils::read.csv(path, stringsAsFactors = FALSE), error = function(error) NULL)
+  if (!is.data.frame(out) || !nrow(out)) return(list())
+  as.list(out[1L, , drop = FALSE])
+}
+
+first_text <- function(value, fallback = "") {
+  value <- as.character(value)
+  if (!length(value) || is.na(value[[1L]]) || !nzchar(trimws(value[[1L]]))) fallback else trimws(value[[1L]])
+}
+
+label_payload <- function(payload_file, payload_dir, label, key) {
+  payload <- readRDS(payload_file)
+  if (!is.list(payload$data)) payload$data <- list()
+  if (!is.list(payload$data$info)) payload$data$info <- list()
+  registry <- payload$data$info$registry
+  if (!is.list(registry)) registry <- list()
+  registry$model_label <- label
+  registry$plot_label <- label
+  registry$model_token <- key
+  registry$job_key <- key
+  payload$data$info$registry <- registry
+  payload$folder <- payload_dir
+  saveRDS(payload, payload_file, compress = "xz")
+  mfclshiny::write_model_payload_manifest(
+    payload = payload,
+    folder = payload_dir,
+    payload_file = payload_file
+  )
+  invisible(payload_file)
+}
 
 if (!length(model_dirs)) {
   stop("No native MFCL model folders containing final.par were found.", call. = FALSE)
@@ -32,7 +74,12 @@ if (is.finite(expected_models) && expected_models > 0L && length(model_dirs) != 
 }
 
 rows <- lapply(model_dirs, function(model_dir) {
-  payload_file <- file.path(model_dir, "model_payload.rds")
+  metadata <- sensitivity_metadata(model_dir)
+  key <- first_text(metadata$key, basename(model_dir))
+  label <- first_text(metadata$label, basename(model_dir))
+  payload_dir <- file.path(payload_root, safe_slug(label, basename(model_dir)))
+  dir.create(payload_dir, recursive = TRUE, showWarnings = FALSE)
+  payload_file <- file.path(payload_dir, "model_payload.rds")
   status <- "existing"
   detail <- ""
   if (!file.exists(payload_file)) {
@@ -49,6 +96,7 @@ rows <- lapply(model_dirs, function(model_dir) {
         if (!file.exists(payload_file)) {
           stop("model_payload.rds was not created", call. = FALSE)
         }
+        label_payload(payload_file, payload_dir, label, key)
         "built"
       },
       error = function(error) {
@@ -58,8 +106,10 @@ rows <- lapply(model_dirs, function(model_dir) {
     )
   }
   data.frame(
-    model = basename(model_dir),
+    model = key,
+    model_label = label,
     model_dir = normalizePath(model_dir, winslash = "/", mustWork = FALSE),
+    payload_dir = normalizePath(payload_dir, winslash = "/", mustWork = FALSE),
     payload_file = normalizePath(payload_file, winslash = "/", mustWork = FALSE),
     status = status,
     detail = detail,
