@@ -282,6 +282,8 @@ write_lf_sensitivity_summary <- function(payload_index, output_dir) {
 
 lf_inject_summary_link <- function(viewer_path) {
   if (!length(viewer_path) || !file.exists(viewer_path)) return(invisible(FALSE))
+  summary_path <- file.path(dirname(viewer_path), "lf-conflict-sensitivity-summary.html")
+  if (!file.exists(summary_path)) return(invisible(FALSE))
   html <- paste(readLines(viewer_path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
   if (grepl("lf-conflict-summary-link", html, fixed = TRUE)) return(invisible(TRUE))
   banner <- paste0(
