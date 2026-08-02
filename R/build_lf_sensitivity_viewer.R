@@ -10,7 +10,13 @@ viewer_title <- env(
   "MFCLSHINY_INTERACTIVE_VIEWER_TITLE",
   "BET 2026 LF conflict sensitivity viewer"
 )
-expected_models <- suppressWarnings(as.integer(env("LF_SENSITIVITY_EXPECTED_MODELS", "36")))
+expected_models <- suppressWarnings(as.integer(env(
+  "RESULTS_VIEWER_EXPECTED_MODELS",
+  env(
+    "LF_SENSITIVITY_EXPECTED_MODELS",
+    env("RESULTS_NATIVE_PAYLOAD_EXPECTED_MODELS", "36")
+  )
+)))
 if (!is.finite(expected_models) || expected_models < 1L) expected_models <- 36L
 
 for (folder in c("overview", "tables", "indices", "logs", "report-ready")) {
