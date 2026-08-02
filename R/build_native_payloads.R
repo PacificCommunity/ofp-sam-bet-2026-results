@@ -28,17 +28,36 @@ safe_slug <- function(value, fallback) {
   if (!nzchar(value)) fallback else value
 }
 
-sensitivity_metadata <- function(model_dir) {
-  path <- file.path(model_dir, "sensitivity-metadata.csv")
-  if (!file.exists(path)) return(list())
-  out <- tryCatch(utils::read.csv(path, stringsAsFactors = FALSE), error = function(error) NULL)
-  if (!is.data.frame(out) || !nrow(out)) return(list())
-  as.list(out[1L, , drop = FALSE])
+model_metadata <- function(model_dir) {
+  candidates <- c("sensitivity-metadata.csv", "ensemble-metadata.csv")
+  for (filename in candidates) {
+    path <- file.path(model_dir, filename)
+    if (!file.exists(path)) next
+    out <- tryCatch(
+      utils::read.csv(path, stringsAsFactors = FALSE),
+      error = function(error) NULL
+    )
+    if (!is.data.frame(out) || !nrow(out)) next
+    return(list(
+      values = as.list(out[1L, , drop = FALSE]),
+      source = filename
+    ))
+  }
+  list(values = list(), source = "")
 }
 
 first_text <- function(value, fallback = "") {
   value <- as.character(value)
   if (!length(value) || is.na(value[[1L]]) || !nzchar(trimws(value[[1L]]))) fallback else trimws(value[[1L]])
+}
+
+first_metadata_text <- function(metadata, fields, fallback = "") {
+  for (field in fields) {
+    value <- metadata[[field]]
+    text <- first_text(value, "")
+    if (nzchar(text)) return(text)
+  }
+  fallback
 }
 
 label_payload <- function(payload_file, payload_dir, label, key) {
@@ -74,9 +93,18 @@ if (is.finite(expected_models) && expected_models > 0L && length(model_dirs) != 
 }
 
 rows <- lapply(model_dirs, function(model_dir) {
-  metadata <- sensitivity_metadata(model_dir)
-  key <- first_text(metadata$key, basename(model_dir))
-  label <- first_text(metadata$label, basename(model_dir))
+  metadata_record <- model_metadata(model_dir)
+  metadata <- metadata_record$values
+  key <- first_metadata_text(
+    metadata,
+    c("key", "ensemble_id", "job_key", "model"),
+    basename(model_dir)
+  )
+  label <- first_metadata_text(
+    metadata,
+    c("label", "model_label", "plot_label"),
+    basename(model_dir)
+  )
   payload_dir <- file.path(payload_root, safe_slug(label, basename(model_dir)))
   dir.create(payload_dir, recursive = TRUE, showWarnings = FALSE)
   payload_file <- file.path(payload_dir, "model_payload.rds")
@@ -108,6 +136,7 @@ rows <- lapply(model_dirs, function(model_dir) {
   data.frame(
     model = key,
     model_label = label,
+    metadata_source = metadata_record$source,
     model_dir = normalizePath(model_dir, winslash = "/", mustWork = FALSE),
     payload_dir = normalizePath(payload_dir, winslash = "/", mustWork = FALSE),
     payload_file = normalizePath(payload_file, winslash = "/", mustWork = FALSE),
