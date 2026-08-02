@@ -105,6 +105,11 @@ rows <- lapply(model_dirs, function(model_dir) {
     c("label", "model_label", "plot_label"),
     basename(model_dir)
   )
+  # Completed sensitivity archives produced before the Lorenzen terminology
+  # correction retain the legacy key/label. Normalize presentation metadata
+  # only; fitted inputs and outputs are never changed here.
+  key <- sub("^m-scaler-", "lorenzen-m-scalar-", key)
+  label <- sub("^M scaler ", "Lorenzen M scalar ", label)
   payload_dir <- file.path(payload_root, safe_slug(label, basename(model_dir)))
   dir.create(payload_dir, recursive = TRUE, showWarnings = FALSE)
   payload_file <- file.path(payload_dir, "model_payload.rds")
