@@ -102,6 +102,9 @@ run the same command.
 | `MFCLSHINY_INTERACTIVE_INCLUDE_FITS` | `true` | Include length, weight, and CPUE fit panels in the offline interactive viewer. |
 | `MFCLSHINY_INTERACTIVE_FIT_MODEL_LIMIT` | `Inf` | Maximum number of models with fit panels; `Inf` keeps all models. |
 | `MFCLSHINY_INTERACTIVE_JSON_DIGITS` | `5` | Significant digits embedded in the portable viewer payload. |
+| `RESULTS_DIAGNOSTIC_INPUT_TOKEN` | empty | Input archive token identifying the Diagnostic model; its viewer label is normalized without changing fitted outputs. |
+| `RESULTS_DIAGNOSTIC_LABEL` | `Diagnostic` | Display label used for the identified Diagnostic model. |
+| `RESULTS_DIAGNOSTIC_KEY` | `diagnostic` | Stable viewer key used for the identified Diagnostic model. |
 | `KFLOW_REPO_RUNTIME_PACKAGES` | exact mfclkit and mfclshiny SHAs | Install only when the cached package does not match the tested release. |
 | `MFCLKIT_GITHUB_REF` / `MFCLSHINY_GITHUB_REF` | reviewed commit SHAs | Keep the local MFCL Shiny app on the same diagnostic reader versions as the results job. |
 ## LF conflict sensitivity results

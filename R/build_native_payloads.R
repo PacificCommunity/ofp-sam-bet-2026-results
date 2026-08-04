@@ -4,6 +4,9 @@ expected_models <- suppressWarnings(as.integer(Sys.getenv(
   "RESULTS_NATIVE_PAYLOAD_EXPECTED_MODELS",
   "0"
 )))
+diagnostic_input_token <- trimws(Sys.getenv("RESULTS_DIAGNOSTIC_INPUT_TOKEN", ""))
+diagnostic_label <- trimws(Sys.getenv("RESULTS_DIAGNOSTIC_LABEL", "Diagnostic"))
+diagnostic_key <- trimws(Sys.getenv("RESULTS_DIAGNOSTIC_KEY", "diagnostic"))
 
 if (!dir.exists(input_dir)) {
   stop("Native payload input directory does not exist: ", input_dir, call. = FALSE)
@@ -105,6 +108,11 @@ rows <- lapply(model_dirs, function(model_dir) {
     c("label", "model_label", "plot_label"),
     basename(model_dir)
   )
+  if (nzchar(diagnostic_input_token) &&
+      grepl(diagnostic_input_token, normalizePath(model_dir, winslash = "/", mustWork = FALSE), fixed = TRUE)) {
+    key <- diagnostic_key
+    label <- diagnostic_label
+  }
   # Completed sensitivity archives produced before the Lorenzen terminology
   # correction retain the legacy key/label. Normalize presentation metadata
   # only; fitted inputs and outputs are never changed here.
